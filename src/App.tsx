@@ -159,47 +159,55 @@ function App() {
   const handleSaveTransaction = async (txData: any) => {
     console.log('[DEBUG App] handleSaveTransaction chamado com:', txData);
 
-    if (txData.id) {
-       // Update
-       console.log('[DEBUG App] Iniciando atualização...');
-       const updated = await updateTransaction(txData.id, {
-          amount: txData.amount,
-          date: txData.date,
-          description: txData.description,
-          group: txData.group,
-          observation: txData.observation,
-          type: txData.type
-       });
+    // Mostra o loading imediatamente para feedback visual
+    setDataLoading(true);
 
-       if (updated) {
-          console.log('[DEBUG App] Atualização retornou sucesso. Atualizando state local.');
-          // Merge o objeto retornado (que pode ser parcial no caso de RLS block) com o existente
-          setTransactions(prev => prev.map(t => {
-             if (t.id === updated.id) {
-                 return { ...t, ...updated };
-             }
-             return t;
-          }));
-       } else {
-          // Fallback final: se até o update cego falhar
-          console.warn("[DEBUG App] Update retornou NULL. Chamando loadUserData() para forçar sincronia.");
-          await loadUserData();
-       }
-    } else {
-       // Create
-       console.log('[DEBUG App] Criando nova transação...');
-       const saved = await addTransaction(txData);
-       if (saved) {
-         setTransactions(prev => [...prev, saved]);
-       }
+    try {
+      if (txData.id) {
+         // Update
+         console.log('[DEBUG App] Iniciando atualização...');
+         await updateTransaction(txData.id, {
+            amount: txData.amount,
+            date: txData.date,
+            description: txData.description,
+            group: txData.group,
+            observation: txData.observation,
+            type: txData.type
+         });
+      } else {
+         // Create
+         console.log('[DEBUG App] Criando nova transação...');
+         await addTransaction(txData);
+      }
+
+      // IMPORTANTE: Força o recarregamento dos dados do servidor
+      // Isso garante que a UI mostre exatamente o que está no banco,
+      // resolvendo problemas de cache local ou IDs alterados.
+      await loadUserData();
+
+    } catch (error) {
+       console.error("Erro ao salvar transação:", error);
+       setDataLoading(false); // Remove loading em caso de erro (se loadUserData não rodar)
     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    const success = await deleteTransaction(id);
-    if (success) {
-      setTransactions(transactions.filter(t => t.id !== id));
-      // Also close details modal if it becomes empty? No, keep it open or let user close
+    setDataLoading(true);
+    try {
+      const success = await deleteTransaction(id);
+      if (success) {
+        // Se deletou com sucesso, recarrega tudo para atualizar totais e listas
+        await loadUserData();
+
+        // Se estávamos vendo detalhes, e a transação sumiu, talvez fechar o modal ou atualizar a lista filtrada?
+        // O loadUserData atualiza 'transactions', que atualiza 'filteredTransactions'.
+        // O modal de detalhes usa 'filteredTransactions', então ele se atualiza sozinho.
+      } else {
+        setDataLoading(false);
+      }
+    } catch (error) {
+      console.error("Erro ao deletar:", error);
+      setDataLoading(false);
     }
   };
 
