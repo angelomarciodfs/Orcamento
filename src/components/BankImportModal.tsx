@@ -30,8 +30,8 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           // 1. Check for Exact Duplicates (Already Imported)
           const existingMatch = existingTransactions.find(ex => {
              const sameDate = ex.date === item.date;
-             const sameAmount = Math.abs(ex.amount - item.amount) < 0.01;
-
+             const sameAmount = Math.abs(ex.amount - item.amount) < 0.01; 
+             
              // Check observation pattern "Importado: DESCRIÇÃO_BANCO"
              const isImportedSameDesc = ex.observation?.toLowerCase().includes(itemDescLower);
              // Or check if user manually named the description same as bank
@@ -55,7 +55,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           const historyMatch = existingTransactions.find(ex => {
               // Matches if the historical transaction's observation contains this bank description
               // e.g. History Obs: "Importado: UBER DO BRASIL" vs Current Desc: "UBER DO BRASIL"
-              return ex.observation?.toLowerCase().includes(itemDescLower) ||
+              return ex.observation?.toLowerCase().includes(itemDescLower) || 
                      ex.description.toLowerCase() === itemDescLower;
           });
 
@@ -92,10 +92,10 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
     if (typeof value === 'number') {
          if (value > 20000) {
              const dateObj = new Date(Math.round((value - 25569) * 86400 * 1000));
-             dateObj.setUTCHours(12);
+             dateObj.setUTCHours(12); 
              return dateObj.toISOString().split('T')[0];
          }
-         return null;
+         return null; 
     }
 
     let str = String(value).trim();
@@ -125,7 +125,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
     if (!file) return;
 
     const fileName = file.name.toLowerCase();
-
+    
     if (fileName.endsWith('.xls') || fileName.endsWith('.xlsx')) {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -135,7 +135,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
             }
         };
         reader.readAsArrayBuffer(file);
-    }
+    } 
     else {
         const reader = new FileReader();
         reader.onload = (event) => {
@@ -152,20 +152,30 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-
+        
         const parsed: ImportItem[] = [];
         let idCounter = 0;
 
         let headerRowIndex = -1;
-        let colMap = { date: -1, desc: -1, credit: -1, debit: -1, value: -1 };
+        // Added 'details' to the mapping
+        let colMap = { date: -1, desc: -1, details: -1, credit: -1, debit: -1, value: -1 };
 
         for (let i = 0; i < jsonData.length; i++) {
             const row = jsonData[i].map(cell => String(cell).toLowerCase().trim());
+            
+            // Check for Date column to identify header row
             if (row.some(c => c.includes('data') || c.includes('dt.'))) {
-                if (row.some(c => c.includes('desc') || c.includes('hist') || c.includes('valor') || c.includes('crédito'))) {
+                // Check for description/value to confirm it's the header
+                if (row.some(c => c.includes('desc') || c.includes('hist') || c.includes('lançamento') || c.includes('valor') || c.includes('crédito'))) {
                     headerRowIndex = i;
                     colMap.date = row.findIndex(c => c.includes('data') || c.includes('dt.'));
-                    colMap.desc = row.findIndex(c => c.includes('desc') || c.includes('hist'));
+                    
+                    // Enhanced Description Detection (BB uses "Lançamento")
+                    colMap.desc = row.findIndex(c => c.includes('desc') || c.includes('hist') || c.includes('lançamento') || c.includes('lancamento'));
+                    
+                    // Added Details Detection (BB uses "Detalhes")
+                    colMap.details = row.findIndex(c => c.includes('detalhes') || c.includes('informações'));
+                    
                     colMap.credit = row.findIndex(c => c.includes('crédito') || c.includes('credito'));
                     colMap.debit = row.findIndex(c => c.includes('débito') || c.includes('debito'));
                     colMap.value = row.findIndex(c => c === 'valor' || c.includes('saldo') === false && c.includes('valor'));
@@ -174,8 +184,9 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
             }
         }
 
+        // Fallback for when headers are not found or ambiguous
         if (headerRowIndex === -1) {
-            colMap = { date: 0, desc: 1, credit: -1, debit: -1, value: 3 };
+            colMap = { date: 0, desc: 1, details: 2, credit: -1, debit: -1, value: 3 }; 
         }
 
         const startRow = headerRowIndex === -1 ? 0 : headerRowIndex + 1;
@@ -188,15 +199,27 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
             const dateIso = parseAnyDate(rawDate);
             if (!dateIso) continue;
 
+            // --- Construction of Description (Concatenating Lançamento + Detalhes if available) ---
             let description = 'Sem descrição';
-            if (colMap.desc !== -1 && row[colMap.desc]) {
-                description = String(row[colMap.desc]).trim();
+            
+            const mainDesc = (colMap.desc !== -1 && row[colMap.desc]) ? String(row[colMap.desc]).trim() : '';
+            const detailDesc = (colMap.details !== -1 && row[colMap.details]) ? String(row[colMap.details]).trim() : '';
+
+            // Filter out system terms if they appear in data rows
+            if (mainDesc.toLowerCase().includes('saldo anterior') || mainDesc.toLowerCase().includes('sdo cta')) continue;
+
+            if (mainDesc && detailDesc) {
+                // Example: "Pix Enviado - Padaria do João"
+                description = `${mainDesc} - ${detailDesc}`;
+            } else if (mainDesc) {
+                description = mainDesc;
+            } else if (detailDesc) {
+                description = detailDesc;
             } else {
+                 // Fallback: try to find a string that isn't the date
                  const possibleDesc = row.find((cell, idx) => idx !== colMap.date && typeof cell === 'string' && cell.length > 5);
                  if (possibleDesc) description = possibleDesc;
             }
-
-            if (description.toLowerCase().includes('saldo anterior') || description.toLowerCase().includes('sdo cta')) continue;
 
             let amount = 0;
             let type: TransactionType = 'EXPENSE';
@@ -269,7 +292,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
 
       lines.forEach(line => {
         if (!line.trim() || line.toLowerCase().includes('saldo')) return;
-
+        
         const cleanLine = line.replace(/"/g, '');
         const separator = cleanLine.includes(';') ? ';' : ',';
         const parts = cleanLine.split(separator);
@@ -300,7 +323,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                 const valStr = parts[valuePartIndex].trim();
                 const valClean = valStr.replace(/\./g, '').replace(',', '.');
                 const valNum = parseFloat(valClean);
-
+                
                 if (!isNaN(valNum)) {
                     amount = Math.abs(valNum);
                     type = valNum < 0 ? 'EXPENSE' : 'INCOME';
@@ -350,12 +373,12 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
   const handleCategoryChange = (id: string, group: string, category: string) => {
     setImportItems(prev => prev.map(p => {
         if (p.id !== id) return p;
-        return {
-            ...p,
-            selectedGroup: group,
+        return { 
+            ...p, 
+            selectedGroup: group, 
             selectedCategory: category,
             // Automatically check the item if a valid category is selected
-            isChecked: category ? true : p.isChecked
+            isChecked: category ? true : p.isChecked 
         };
     }));
   };
@@ -389,7 +412,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-
+        
         {/* Header - Fixed */}
         <div className="flex justify-between items-center p-4 border-b shrink-0">
           <h2 className="text-xl font-semibold text-gray-800">Importar Extrato Bancário</h2>
@@ -416,10 +439,10 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                         <Upload size={48} className="text-gray-400 mb-2" />
                         <p className="text-gray-600 font-medium">Clique para selecionar o arquivo</p>
                         <p className="text-xs text-gray-400 mt-1">Suporta: .XLS, .XLSX (Santander/BB) e .CSV</p>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
                             accept=".csv,.txt,.xls,.xlsx"
                             onChange={handleFileUpload}
                         />
@@ -443,9 +466,9 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                             <thead className="text-gray-700">
                                 <tr>
                                     <th className="p-2 w-10 text-center border-b border-gray-300 sticky top-0 bg-gray-100 z-10 shadow-sm">
-                                        <input type="checkbox"
+                                        <input type="checkbox" 
                                             checked={importItems.length > 0 && importItems.every(i => i.isChecked)}
-                                            onChange={(e) => handleToggleAll(e.target.checked)}
+                                            onChange={(e) => handleToggleAll(e.target.checked)} 
                                             title="Marcar/Desmarcar Todos"
                                         />
                                     </th>
@@ -457,23 +480,23 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                             </thead>
                             <tbody className="divide-y divide-gray-200">
                                 {importItems.map(item => (
-                                    <tr
-                                        key={item.id}
+                                    <tr 
+                                        key={item.id} 
                                         className={`
                                             transition-colors border-b border-gray-100
-                                            ${item.isPossibleDuplicate
+                                            ${item.isPossibleDuplicate 
                                                 ? 'bg-amber-200 hover:bg-amber-300 text-amber-900' // Darker, distinct orange/amber for duplicates
                                                 : 'bg-white hover:bg-gray-50'
-                                            }
-                                            ${!item.isChecked
+                                            } 
+                                            ${!item.isChecked 
                                                 ? (item.isPossibleDuplicate ? 'opacity-85' : 'opacity-60 grayscale-[0.5]') // Less fade for duplicates so color pops
                                                 : ''
                                             }
                                         `}
                                     >
                                         <td className="p-2 text-center">
-                                            <input
-                                                type="checkbox"
+                                            <input 
+                                                type="checkbox" 
                                                 checked={item.isChecked}
                                                 onChange={() => handleToggle(item.id)}
                                             />
@@ -495,7 +518,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                                             {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                         </td>
                                         <td className="p-2 w-64">
-                                            <select
+                                            <select 
                                                 className={`w-full border rounded p-1.5 text-sm transition-colors ${!item.selectedCategory && item.isChecked ? 'border-red-300 bg-red-50' : 'border-gray-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200'} cursor-pointer text-gray-800`}
                                                 value={item.selectedCategory}
                                                 onChange={(e) => {
@@ -536,7 +559,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         {/* Footer - Fixed */}
         <div className="p-4 border-t flex justify-end gap-3 bg-gray-50 shrink-0">
             {step === 'CLASSIFY' && (
-                <button
+                <button 
                     onClick={() => { setImportItems([]); setStep('UPLOAD'); }}
                     className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded font-medium"
                 >
@@ -544,7 +567,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                 </button>
             )}
             {step === 'CLASSIFY' ? (
-                 <button
+                 <button 
                  onClick={handleConfirmImport}
                  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 flex items-center gap-2 shadow-sm font-semibold"
                 >
