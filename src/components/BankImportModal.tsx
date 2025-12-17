@@ -51,19 +51,50 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           }
 
           // 2. Smart Classification (History Learning)
-          // If not a duplicate, look for ANY previous transaction that came from this bank description
+          // Improved Logic: Fuzzy match between current bank description and historical data
           const historyMatch = existingTransactions.find(ex => {
-              // Matches if the historical transaction's observation contains this bank description
-              // e.g. History Obs: "Importado: UBER DO BRASIL" vs Current Desc: "UBER DO BRASIL"
-              return ex.observation?.toLowerCase().includes(itemDescLower) || 
-                     ex.description.toLowerCase() === itemDescLower;
+              if (!ex.group) return false;
+
+              const exDesc = ex.description.toLowerCase().trim();
+              const exObs = ex.observation?.toLowerCase().trim() || '';
+
+              // Extract pure bank text from history if it was an import
+              // Saved format is usually "Importado: [BANK_TEXT]"
+              let historicBankText = '';
+              if (exObs.startsWith('importado:')) {
+                  historicBankText = exObs.replace('importado:', '').trim();
+              } else {
+                  // If manual, use the observation as potential match source if it's substantial
+                  historicBankText = exObs;
+              }
+
+              // Logic A: Exact Match on User Description
+              // Ex: User manually saved "Netflix" -> Current import "Netflix"
+              if (exDesc === itemDescLower) return true;
+
+              // Logic B: Fuzzy Match on Historical Bank Text
+              if (historicBankText && historicBankText.length > 2) {
+                  // Case 1: Current import contains historical text
+                  // History: "Uber" -> Current: "Uber * Trip"
+                  // History: "Padaria A" -> Current: "Pix - Padaria A" (BB Case)
+                  if (itemDescLower.includes(historicBankText)) return true;
+
+                  // Case 2: Historical text contains current import
+                  // History: "Pix - Padaria A" -> Current: "Padaria A" (Santander Case)
+                  if (historicBankText.includes(itemDescLower)) return true;
+              }
+
+              // Logic C: Reverse check on Description (if description is distinctive)
+              if (exDesc.length > 3 && itemDescLower.includes(exDesc)) return true;
+
+              return false;
           });
 
           if (historyMatch) {
               return {
                   ...item,
                   isPossibleDuplicate: false,
-                  isChecked: false, // Default unchecked per user request
+                  isChecked: false, // User prefers unchecked by default
                   selectedGroup: historyMatch.group,
                   selectedCategory: historyMatch.description
               };
@@ -157,7 +188,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         let idCounter = 0;
 
         let headerRowIndex = -1;
-        // Added 'details' to the mapping
+        // Added 'details' to the mapping logic
         let colMap = { date: -1, desc: -1, details: -1, credit: -1, debit: -1, value: -1 };
 
         for (let i = 0; i < jsonData.length; i++) {
