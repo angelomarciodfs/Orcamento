@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Transaction, TransactionType, CategoryStructure } from '../types';
-import { Settings, FileSpreadsheet } from 'lucide-react';
+import { Settings, FileSpreadsheet, CreditCard } from 'lucide-react';
 
 interface BudgetTableProps {
   transactions: Transaction[];
@@ -13,9 +13,9 @@ interface BudgetTableProps {
   onCategoryClick: (category: string, group: string) => void;
 }
 
-const BudgetTable: React.FC<BudgetTableProps> = ({
-  transactions,
-  totalIncome,
+const BudgetTable: React.FC<BudgetTableProps> = ({ 
+  transactions, 
+  totalIncome, 
   onOpenModalFor,
   incomeCategories,
   expenseGroups,
@@ -23,8 +23,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
   onOpenImport,
   onCategoryClick
 }) => {
-
-  const formatCurrency = (val: number) =>
+  
+  const formatCurrency = (val: number) => 
     new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
 
   const calcPercent = (val: number) => {
@@ -41,15 +41,18 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
   // Main Income/Expense Logic
   const expenseTransactions = transactions.filter(t => t.type === 'EXPENSE');
   const totalExpenses = expenseTransactions.reduce((acc, t) => acc + t.amount, 0);
-  const resultFinal = totalIncome - totalExpenses;
-
-  // Extra & Banking Logic
+  
+  // Extra Income for current month
   const extraIncome = transactions.filter(t => t.type === 'EXTRA' && t.description === 'Receita Extra').reduce((acc, t) => acc + t.amount, 0);
+
+  // Result Calculation: (Income) - Expenses
+  const resultFinal = totalIncome - totalExpenses; 
 
   const santanderBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Santander').reduce((acc, t) => acc + t.amount, 0);
   const bbBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Banco do Brasil').reduce((acc, t) => acc + t.amount, 0);
   const interBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Banco Inter').reduce((acc, t) => acc + t.amount, 0);
 
+  // Total Bancário includes Result + Extra + Banks
   const totalBancario = santanderBalance + bbBalance + resultFinal + extraIncome;
   const totalFinanceiro = totalBancario + interBalance;
 
@@ -57,22 +60,22 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
   const cellBase = "px-2 py-1 border-r border-gray-300 text-sm flex items-center";
   const cellValue = "px-2 py-1 border-r border-gray-300 text-sm text-right font-mono flex items-center justify-end";
   const cellPercent = "px-2 py-1 text-xs text-center font-mono flex items-center justify-center bg-gray-50 text-gray-600";
-
+  
   interface RowProps {
     label: string;
     value?: number;
     isGroupHeader?: boolean;
-    groupName?: string;
+    groupName?: string; 
     onAddClick?: () => void;
     bgColor?: string;
     textColor?: string;
-    isEditable?: boolean; // For manual adding (edit icon on right)
+    isEditable?: boolean; 
   }
 
-  const Row: React.FC<RowProps> = ({
-    label,
-    value,
-    isGroupHeader = false,
+  const Row: React.FC<RowProps> = ({ 
+    label, 
+    value, 
+    isGroupHeader = false, 
     groupName,
     onAddClick,
     bgColor = "bg-white",
@@ -80,7 +83,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
     isEditable = false,
   }) => (
     <div className={`grid grid-cols-[1fr_140px_80px] border-b border-gray-300 hover:brightness-95 transition-all group ${bgColor} ${textColor}`}>
-      <div
+      <div 
         className={`${cellBase} ${isGroupHeader ? 'font-bold uppercase tracking-wider' : 'cursor-pointer hover:underline'} relative`}
         onClick={() => {
             if(!isGroupHeader) {
@@ -94,7 +97,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
       <div className={`${cellValue} relative`}>
         {value !== undefined ? formatCurrency(value) : ''}
         {isEditable && onAddClick && (
-           <button
+           <button 
              onClick={(e) => { e.stopPropagation(); onAddClick(); }}
              className="absolute left-2 text-blue-500 hover:text-blue-700 opacity-50 hover:opacity-100 transition-opacity"
              title="Inserir valor manualmente"
@@ -112,25 +115,32 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4">
 
-      <div className="flex justify-end gap-2">
-         <button
+      <div className="flex flex-wrap justify-end gap-2">
+         <button 
            onClick={onManageCategories}
            className="flex items-center gap-2 px-3 py-1.5 bg-gray-600 text-white rounded shadow text-sm hover:bg-gray-700 transition-colors"
          >
            <Settings size={16} />
-           Gerenciar Categorias
+           Categorias
          </button>
-         <button
+         <button 
            onClick={onOpenImport}
            className="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white rounded shadow text-sm hover:bg-indigo-700 transition-colors"
          >
            <FileSpreadsheet size={16} />
-           Importar Extrato
+           Extrato Bancário
+         </button>
+         <button 
+           onClick={onOpenImport}
+           className="flex items-center gap-2 px-3 py-1.5 bg-orange-600 text-white rounded shadow text-sm hover:bg-orange-700 transition-colors"
+         >
+           <CreditCard size={16} />
+           Fatura Cartão
          </button>
       </div>
 
       <div className="bg-white shadow-2xl overflow-hidden border border-gray-400">
-
+        
         {/* HEADER PRINCIPAL */}
         <div className="grid grid-cols-[1fr_140px_80px] bg-gray-800 text-white font-bold text-sm border-b border-gray-800">
           <div className="px-2 py-2 uppercase text-center border-r border-gray-600">Categoria</div>
@@ -159,7 +169,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
 
         {/* ================= DESPESAS ================= */}
         <div className="h-4 bg-gray-100 border-b border-gray-300"></div> {/* Spacer */}
-
+        
         <div className="grid grid-cols-[1fr_140px_80px] bg-[#f2dcdb] border-b border-gray-400 text-[#963634] font-bold">
           <div className="px-2 py-1 uppercase">SAÍDAS (DESPESAS)</div>
           <div className="px-2 py-1"></div>
@@ -170,7 +180,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
           return (
             <React.Fragment key={group.name}>
                <Row label={group.name} isGroupHeader bgColor="bg-[#fde9d9]" textColor="text-[#e26b0a]" />
-
+               
                {group.items.map(item => {
                   const val = getSum(item, group.name);
                   return <Row key={item} label={item} groupName={group.name} value={val} bgColor="bg-white" />;
@@ -189,12 +199,12 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
         <div className="h-4 bg-gray-100 border-b border-gray-300"></div>
 
         <div className="grid grid-cols-[1fr_140px_80px] bg-black text-white font-bold border-t-2 border-gray-800">
-          <div className="px-2 py-2 uppercase flex items-center">RESULTADO (Receita - Despesa)</div>
+          <div className="px-2 py-2 uppercase flex items-center">RESULTADO (Mês)</div>
           <div className={`px-2 py-2 text-right font-mono text-lg ${resultFinal >= 0 ? 'text-[#a9d08e]' : 'text-[#ff7c80]'}`}>
             {formatCurrency(resultFinal)}
           </div>
           <div className={`px-2 py-2 text-center flex items-center justify-center font-mono ${resultFinal >= 0 ? 'text-[#a9d08e]' : 'text-[#ff7c80]'}`}>
-             {calcPercent(resultFinal)}
+             {/* Percent of this month's revenue? Or just status */}
           </div>
         </div>
 
@@ -207,11 +217,11 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
           <div className="px-2 py-1"></div>
           <div className="px-2 py-1"></div>
         </div>
-        <Row
-          label="Receita Extra"
-          value={extraIncome}
-          bgColor="bg-white"
-          isEditable
+        <Row 
+          label="Receita Extra" 
+          value={extraIncome} 
+          bgColor="bg-white" 
+          isEditable 
           groupName="Extra"
           onAddClick={() => {
              onOpenModalFor('EXTRA', 'Receita Extra', 'Extra');
@@ -224,25 +234,25 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
            <div className="px-2 py-1"></div>
            <div className="px-2 py-1"></div>
         </div>
-        <Row
-          label="Santander"
-          value={santanderBalance}
-          bgColor="bg-[#d7e4bc]"
-          isEditable
+        <Row 
+          label="Santander" 
+          value={santanderBalance} 
+          bgColor="bg-[#d7e4bc]" 
+          isEditable 
           groupName="Bancos"
           onAddClick={() => onOpenModalFor('BALANCE', 'Santander', 'Bancos')}
         />
-        <Row
-          label="Banco do Brasil"
-          value={bbBalance}
-          bgColor="bg-[#d7e4bc]"
-          isEditable
+        <Row 
+          label="Banco do Brasil" 
+          value={bbBalance} 
+          bgColor="bg-[#d7e4bc]" 
+          isEditable 
           groupName="Bancos"
           onAddClick={() => onOpenModalFor('BALANCE', 'Banco do Brasil', 'Bancos')}
         />
-
+        
         <div className="grid grid-cols-[1fr_140px_80px] bg-[#92d050] text-black font-bold border-y border-gray-600">
-           <div className="px-2 py-1 uppercase">TOTAL BANCÁRIO</div>
+           <div className="px-2 py-1 uppercase">TOTAL BANCÁRIO (Res + Extra + Bancos)</div>
            <div className="px-2 py-1 text-right font-mono">{formatCurrency(totalBancario)}</div>
            <div className="px-2 py-1"></div>
         </div>
@@ -253,10 +263,10 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
            <div className="px-2 py-1"></div>
            <div className="px-2 py-1"></div>
         </div>
-        <Row
-          label="Banco Inter"
-          value={interBalance}
-          bgColor="bg-white"
+        <Row 
+          label="Banco Inter" 
+          value={interBalance} 
+          bgColor="bg-white" 
           isEditable
           groupName="Investimentos"
           onAddClick={() => onOpenModalFor('BALANCE', 'Banco Inter', 'Investimentos')}
