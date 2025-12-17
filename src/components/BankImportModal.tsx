@@ -24,8 +24,29 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
 
   // --- Process Items (Duplicate Check + Smart Classification) ---
   const processImportedItems = (items: ImportItem[]): ImportItem[] => {
+      
+      // Helper to extract the relevant part of the description (skipping date/time prefixes typical of BB)
+      const getCleanDescription = (fullDesc: string) => {
+          // BB Pattern Example: "Compra com Cartão - 21/10 13:42 UBER *TRIP"
+          // Regex looks for date (DD/MM) optionally followed by time (HH:MM)
+          // We assume the Merchant Name comes AFTER this timestamp.
+          const datePattern = /\d{2}\/\d{2}(?:\s\d{2}:\d{2})?/;
+          const match = fullDesc.match(datePattern);
+          
+          if (match && match.index !== undefined) {
+              // Extract everything AFTER the date pattern
+              const afterDate = fullDesc.substring(match.index + match[0].length);
+              // Remove typical separators like " - " or leading spaces
+              return afterDate.replace(/^[-\s]+/, '').toLowerCase().trim();
+          }
+          
+          // If no date pattern found (e.g. Santander), return full description cleaned
+          return fullDesc.toLowerCase().trim();
+      };
+
       return items.map(item => {
           const itemDescLower = item.description.toLowerCase().trim();
+          const itemCleaned = getCleanDescription(item.description);
 
           // 1. Check for Exact Duplicates (Already Imported)
           const existingMatch = existingTransactions.find(ex => {
@@ -51,41 +72,28 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           }
 
           // 2. Smart Classification (History Learning)
-          // Improved Logic: Fuzzy match between current bank description and historical data
           const historyMatch = existingTransactions.find(ex => {
               if (!ex.group) return false;
 
-              const exDesc = ex.description.toLowerCase().trim();
-              const exObs = ex.observation?.toLowerCase().trim() || '';
+              const historyDesc = ex.description.toLowerCase().trim();
+              
+              // Logic A: Exact Match on cleaned text (Best case)
+              // New Item: "Uber Trip" (cleaned) == History: "Uber Trip"
+              if (itemCleaned === historyDesc) return true;
 
-              // Extract pure bank text from history if it was an import
-              // Saved format is usually "Importado: [BANK_TEXT]"
-              let historicBankText = '';
-              if (exObs.startsWith('importado:')) {
-                  historicBankText = exObs.replace('importado:', '').trim();
-              } else {
-                  // If manual, use the observation as potential match source if it's substantial
-                  historicBankText = exObs;
-              }
+              // Logic B: Partial Match
+              // History: "Uber" is inside New Item: "Uber Trip"
+              if (itemCleaned.includes(historyDesc) && historyDesc.length > 2) return true;
 
-              // Logic A: Exact Match on User Description
-              // Ex: User manually saved "Netflix" -> Current import "Netflix"
-              if (exDesc === itemDescLower) return true;
+              // Logic C: Reverse Partial
+              // History: "Uber Trip" contains New Item: "Uber" (less likely but possible)
+              if (historyDesc.includes(itemCleaned) && itemCleaned.length > 2) return true;
 
-              // Logic B: Fuzzy Match on Historical Bank Text
-              if (historicBankText && historicBankText.length > 2) {
-                  // Case 1: Current import contains historical text
-                  // History: "Uber" -> Current: "Uber * Trip"
-                  // History: "Padaria A" -> Current: "Pix - Padaria A" (BB Case)
-                  if (itemDescLower.includes(historicBankText)) return true;
-
-                  // Case 2: Historical text contains current import
-                  // History: "Pix - Padaria A" -> Current: "Padaria A" (Santander Case)
-                  if (historicBankText.includes(itemDescLower)) return true;
-              }
-
-              // Logic C: Reverse check on Description (if description is distinctive)
-              if (exDesc.length > 3 && itemDescLower.includes(exDesc)) return true;
+              // Logic D: Check against Observation in history (if history was also an import)
+              // If history has "Importado: ... Uber ...", check if that matches our new item
+              const historyObs = ex.observation?.toLowerCase() || '';
+              // Simple check: does the history observation contain our cleaned merchant name?
+              if (historyObs.includes(itemCleaned) && itemCleaned.length > 3) return true;
 
               return false;
           });
@@ -94,7 +102,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
               return {
                   ...item,
                   isPossibleDuplicate: false,
-                  isChecked: false, // User prefers unchecked by default
+                  isChecked: false, // Default unchecked, user reviews suggestions
                   selectedGroup: historyMatch.group,
                   selectedCategory: historyMatch.description
               };
