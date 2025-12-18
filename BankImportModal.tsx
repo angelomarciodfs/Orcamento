@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Upload, AlertCircle, AlertTriangle, FileText, CheckCircle2 } from 'lucide-react';
+import { X, Upload, AlertCircle, AlertTriangle, FileText, Check, Wand2 } from 'lucide-react';
 import type { ImportItem, CategoryStructure, TransactionType, Transaction } from './types';
 import * as XLSX from 'xlsx';
 
@@ -23,15 +23,53 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
 
   if (!isOpen) return null;
 
+  const getCleanDescription = (fullDesc: string) => {
+    // Remove padrões de data/hora comuns em extratos (ex: 21/10 13:42)
+    const datePattern = /\d{2}\/\d{2}(?:\s\d{2}:\d{2})?/;
+    const match = fullDesc.match(datePattern);
+    if (match && match.index !== undefined) {
+      const afterDate = fullDesc.substring(match.index + match[0].length);
+      return afterDate.replace(/^[-\s]+/, '').toLowerCase().trim();
+    }
+    return fullDesc.toLowerCase().trim();
+  };
+
+  const processImportedItems = (items: ImportItem[]): ImportItem[] => {
+    return items.map(item => {
+      const itemDescLower = item.description.toLowerCase().trim();
+      const itemCleaned = getCleanDescription(item.description);
+
+      // 1. Verificar Duplicados Exatos
+      const isDuplicate = existingTransactions.some(ex => {
+        const sameDate = ex.date === item.date;
+        const sameAmount = Math.abs(Math.abs(ex.amount) - item.amount) < 0.01;
+        const isImported = ex.observation?.toLowerCase().includes(itemDescLower);
+        return sameDate && sameAmount && isImported;
+      });
+
+      // 2. Busca no Histórico para Classificação Automática
+      const historyMatch = existingTransactions.find(ex => {
+        if (!ex.group) return false;
+        const historyDesc = ex.description.toLowerCase().trim();
+        return itemCleaned === historyDesc || 
+               itemCleaned.includes(historyDesc) && historyDesc.length > 3 ||
+               historyDesc.includes(itemCleaned) && itemCleaned.length > 3;
+      });
+
+      return {
+        ...item,
+        isPossibleDuplicate: isDuplicate,
+        isChecked: !isDuplicate && !!historyMatch,
+        selectedGroup: historyMatch?.group || (item.type === 'INCOME' ? 'Receitas' : (expenseGroups[0]?.name || '')),
+        selectedCategory: historyMatch?.description || ''
+      };
+    });
+  };
+
   const parseNum = (v: any): number => {
     if (typeof v === 'number') return v;
     if (!v) return 0;
-    
-    let str = String(v).trim();
-    // Remove símbolos monetários
-    str = str.replace('R$', '').replace('$', '').trim();
-
-    // Lógica para formatos brasileiros (1.234,56)
+    let str = String(v).trim().replace('R$', '').replace('$', '').trim();
     if (str.includes(',') && str.includes('.')) {
       if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
         str = str.replace(/\./g, '').replace(',', '.');
@@ -41,186 +79,122 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
     } else if (str.includes(',')) {
       str = str.replace(',', '.');
     }
-    
     const n = parseFloat(str);
     return isNaN(n) ? 0 : n;
   };
 
   const parseAnyDate = (value: any): string | null => {
     if (value === undefined || value === null) return null;
-    
-    if (value instanceof Date) {
-      if (isNaN(value.getTime())) return null;
-      return value.toISOString().split('T')[0];
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString().split('T')[0];
+    if (typeof value === 'number' && value > 20000) {
+      try {
+        const dateObj = XLSX.SSF.parse_date_code(value);
+        return `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
+      } catch { return null; }
     }
-
-    if (typeof value === 'number') {
-      if (value > 20000) {
-        try {
-           const dateObj = XLSX.SSF.parse_date_code(value);
-           // Fix: Corrected date string segment construction to avoid duplicate month parts
-           return `${dateObj.y}-${String(dateObj.m).padStart(2, '0')}-${String(dateObj.d).padStart(2, '0')}`;
-        } catch(e) { return null; }
-      }
-      return null;
-    }
-
     let str = String(value).trim();
     if (!str || str.includes('0001')) return null;
-
     const matchBR = str.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
     if (matchBR) {
       const day = matchBR[1].padStart(2, '0');
       const month = matchBR[2].padStart(2, '0');
-      let year = matchBR[3];
-      if (year.length === 2) year = `20${year}`;
+      let year = matchBR[3].length === 2 ? `20${matchBR[3]}` : matchBR[3];
       return `${year}-${month}-${day}`;
     }
-
-    const matchISO = str.match(/(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
-    if (matchISO) return `${matchISO[1]}-${matchISO[2].padStart(2, '0')}-${matchISO[3].padStart(2, '0')}`;
-
     return null;
-  };
-
-  const findColumnIndices = (headers: string[]) => {
-    const cols = { date: -1, desc: -1, amount: -1, credit: -1, debit: -1 };
-    
-    const dateSynonyms = ['data', 'dt.', 'vencimento', 'date'];
-    const descSynonyms = ['descrição', 'descricão', 'historico', 'histórico', 'lançamento', 'description'];
-    const amountSynonyms = ['valor (r$)', 'valor r$', 'quantia', 'amount'];
-    const creditSynonyms = ['crédito', 'credito', 'entradas', 'proventos'];
-    const debitSynonyms = ['débito', 'debito', 'saídas', 'descontos'];
-
-    headers.forEach((h, idx) => {
-      const cleanH = h.toLowerCase().trim();
-      if (cols.date === -1 && dateSynonyms.some(s => cleanH.includes(s))) cols.date = idx;
-      if (cols.desc === -1 && descSynonyms.some(s => cleanH.includes(s))) cols.desc = idx;
-      if (cols.amount === -1 && amountSynonyms.some(s => cleanH === s)) cols.amount = idx;
-      if (cols.credit === -1 && creditSynonyms.some(s => cleanH.includes(s))) cols.credit = idx;
-      if (cols.debit === -1 && debitSynonyms.some(s => cleanH.includes(s))) cols.debit = idx;
-    });
-
-    return cols;
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-
-        if (jsonData.length === 0) {
-          setError("Arquivo vazio.");
-          return;
-        }
-
+        const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 }) as any[][];
+        
         let headerIdx = -1;
-        let colIndices = { date: -1, desc: -1, amount: -1, credit: -1, debit: -1 };
+        let colMap = { date: -1, descs: [] as number[], credit: -1, debit: -1, amount: -1 };
 
-        // Busca o cabeçalho
+        // Identificação de colunas flexível (incluindo "Lançamento" e "Detalhes" do BB)
+        const dateSyns = ['data', 'dt.'];
+        const descSyns = ['descrição', 'descricão', 'historico', 'histórico', 'lançamento', 'lancamento', 'detalhes', 'detalhe', 'informação', 'docto'];
+        const creditSyns = ['crédito', 'credito', 'entrada'];
+        const debitSyns = ['débito', 'debito', 'saída'];
+
         for (let i = 0; i < Math.min(jsonData.length, 30); i++) {
-          const row = jsonData[i].map(c => String(c || ''));
-          const found = findColumnIndices(row);
-          if (found.date !== -1 && (found.amount !== -1 || (found.credit !== -1 && found.debit !== -1))) {
+          const row = jsonData[i].map(c => String(c || '').toLowerCase().trim());
+          if (row.some(c => dateSyns.some(s => c.includes(s)))) {
             headerIdx = i;
-            colIndices = found;
+            row.forEach((cell, idx) => {
+              if (dateSyns.some(s => cell.includes(s))) colMap.date = idx;
+              if (descSyns.some(s => cell.includes(s))) colMap.descs.push(idx);
+              if (creditSyns.some(s => cell.includes(s))) colMap.credit = idx;
+              if (debitSyns.some(s => cell.includes(s))) colMap.debit = idx;
+              if (cell === 'valor' || (cell.includes('valor') && !cell.includes('saldo'))) colMap.amount = idx;
+            });
             break;
           }
         }
 
         if (headerIdx === -1) {
-          setError("Não identificamos as colunas de Data e Valor. O arquivo deve tel cabeçalhos como 'Data', 'Descrição' e 'Valor' ou 'Crédito'/'Débito'.");
+          setError("Não foi possível identificar o cabeçalho do extrato.");
           return;
         }
 
         const parsed: ImportItem[] = [];
-        let idCounter = 0;
-
         for (let i = headerIdx + 1; i < jsonData.length; i++) {
           const row = jsonData[i];
-          if (!row || row.length === 0) continue;
-
-          const date = parseAnyDate(row[colIndices.date]);
+          if (!row) continue;
+          const date = parseAnyDate(row[colMap.date]);
           if (!date) continue;
 
-          const description = String(row[colIndices.desc] || '').trim();
-          const lowerDesc = description.toLowerCase();
-          
-          // Ignora linhas de rodapé/resumo baseadas no seu extrato
-          const blacklist = ['saldo anterior', 'total', 'saldo atual', 'saldo de conta', 'bloqueado', 'limite', 'disponível', 'juros', 'iof acumulado'];
-          if (blacklist.some(b => lowerDesc.includes(b))) continue;
-          if (!description) continue;
+          // Fusão de Colunas de Descrição (BB/Santander)
+          const rawDescription = colMap.descs
+            .map(idx => String(row[idx] || '').trim())
+            .filter(s => !!s)
+            .join(' - ');
 
-          let finalAmount = 0;
+          if (!rawDescription || /saldo|anterior|resumo|total|limite/i.test(rawDescription)) continue;
+
+          let val = 0;
           let type: TransactionType = 'EXPENSE';
 
-          // Lógica para colunas separadas (Santander/BB)
-          if (colIndices.credit !== -1 || colIndices.debit !== -1) {
-             const creditVal = parseNum(row[colIndices.credit]);
-             const debitVal = parseNum(row[colIndices.debit]);
-
-             if (creditVal !== 0) {
-                finalAmount = Math.abs(creditVal);
-                type = 'INCOME';
-             } else if (debitVal !== 0) {
-                finalAmount = Math.abs(debitVal);
-                type = 'EXPENSE';
-             }
-          } else {
-             // Lógica para coluna única
-             const amountRaw = parseNum(row[colIndices.amount]);
-             finalAmount = Math.abs(amountRaw);
-             type = amountRaw < 0 ? 'INCOME' : 'EXPENSE';
+          // Lógica Santander/BB com colunas Crédito/Débito
+          if (colMap.credit !== -1 || colMap.debit !== -1) {
+            const c = parseNum(row[colMap.credit]);
+            const d = parseNum(row[colMap.debit]);
+            if (c !== 0) { val = Math.abs(c); type = 'INCOME'; }
+            else if (d !== 0) { val = Math.abs(d); type = 'EXPENSE'; }
+          } else if (colMap.amount !== -1) {
+            const a = parseNum(row[colMap.amount]);
+            val = Math.abs(a);
+            type = a < 0 ? 'EXPENSE' : 'INCOME'; // Em coluna única, negativo costuma ser despesa
           }
 
-          if (finalAmount !== 0) {
-            let suggestedGroup = type === 'EXPENSE' ? (expenseGroups[0]?.name || '') : 'Receitas';
-            let suggestedCategory = '';
-            
-            // Tenta achar no histórico
-            const match = existingTransactions.find(t => 
-              t.description.toLowerCase().includes(description.toLowerCase().substring(0, 10))
-            );
-            
-            if (match) {
-              suggestedGroup = match.group;
-              suggestedCategory = match.description;
-            }
-
+          if (val > 0) {
             parsed.push({
-              id: `import-${Date.now()}-${idCounter++}`,
+              id: `imp-${i}-${Date.now()}`,
               date,
-              description,
-              amount: finalAmount,
+              description: rawDescription,
+              amount: val,
               type,
-              selectedCategory: suggestedCategory,
-              selectedGroup: suggestedGroup,
-              isChecked: suggestedCategory !== '',
-              isPossibleDuplicate: existingTransactions.some(et => 
-                et.date === date && Math.abs(Math.abs(et.amount) - finalAmount) < 0.01
-              )
+              selectedGroup: '',
+              selectedCategory: '',
+              isChecked: false
             });
           }
         }
 
         if (parsed.length > 0) {
-          setImportItems(parsed);
+          setImportItems(processImportedItems(parsed));
           setStep('CLASSIFY');
           setError(null);
         } else {
-          setError("Nenhum lançamento identificado. Verifique se o arquivo contém dados após o cabeçalho.");
+          setError("Nenhum lançamento identificado nas colunas de valor.");
         }
-
-      } catch (err) {
-        setError("Erro ao ler arquivo. Tente outro formato.");
-      }
+      } catch (err) { setError("Erro ao processar arquivo."); }
     };
     reader.readAsArrayBuffer(file);
   };
@@ -228,7 +202,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
   const handleConfirm = () => {
     const selected = importItems.filter(i => i.isChecked && i.selectedCategory);
     if (selected.length === 0) {
-      alert("Selecione os itens e suas categorias.");
+      alert("Selecione os lançamentos e defina suas categorias.");
       return;
     }
     onImport(selected);
@@ -236,75 +210,85 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
         
+        {/* Header */}
         <div className="flex justify-between items-center p-5 border-b bg-gray-50 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-2 rounded-lg text-white">
-              <Upload size={20} />
-            </div>
+            <div className="bg-indigo-600 p-2 rounded-lg text-white"><Upload size={20} /></div>
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Importação de Extrato</h2>
-              <p className="text-xs text-gray-500 uppercase font-semibold">Passo {step === 'UPLOAD' ? '1: Enviar Arquivo' : '2: Classificar Itens'}</p>
+              <h2 className="text-xl font-bold text-gray-800">Importador de Extrato</h2>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-wider">Passo {step === 'UPLOAD' ? '1: Enviar Arquivo' : '2: Classificar Itens'}</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100">
-            <X size={24} />
-          </button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"><X size={24} /></button>
         </div>
 
+        {/* Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50/30">
           {error && (
-            <div className="p-4">
-              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm flex items-start gap-3">
-                <AlertCircle size={20} className="shrink-0" />
-                <p className="text-xs">{error}</p>
+            <div className="p-4 shrink-0">
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 text-xs text-red-700 flex gap-2">
+                <AlertCircle size={16}/> {error}
               </div>
             </div>
           )}
 
           {step === 'UPLOAD' ? (
-            <div className="p-10 flex-1 flex flex-col items-center justify-center text-center">
+            <div className="p-10 flex-1 flex flex-col items-center justify-center">
               <div 
-                className="w-full max-w-lg border-3 border-dashed border-gray-300 rounded-3xl p-12 flex flex-col items-center hover:border-indigo-400 hover:bg-indigo-50/30 cursor-pointer transition-all"
+                className="w-full max-w-lg border-3 border-dashed border-gray-300 rounded-3xl p-12 flex flex-col items-center hover:bg-indigo-50/50 cursor-pointer transition-all"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <FileText size={48} className="text-gray-300 mb-4" />
-                <h3 className="text-lg font-bold text-gray-800">Clique para selecionar o Extrato</h3>
-                <p className="text-sm text-gray-500 mt-2">Aceita XLS, XLSX e CSV (Santander, BB, Itaú, etc)</p>
+                <FileText size={50} className="text-gray-300 mb-4" />
+                <h3 className="text-lg font-bold text-gray-800">Selecione seu Extrato</h3>
+                <p className="text-sm text-gray-500 mt-2">Santander, Banco do Brasil, Itaú, etc. (XLSX, CSV)</p>
                 <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xls,.xlsx" onChange={handleFileUpload} />
+              </div>
+              <div className="mt-8 flex gap-6 opacity-40 grayscale">
+                <span className="text-[10px] font-bold uppercase flex items-center gap-1"><Check size={14}/> Fusão de Colunas</span>
+                <span className="text-[10px] font-bold uppercase flex items-center gap-1"><Check size={14}/> Memória de Histórico</span>
+                <span className="text-[10px] font-bold uppercase flex items-center gap-1"><Check size={14}/> Detecção de Duplicados</span>
               </div>
             </div>
           ) : (
             <div className="flex-1 overflow-auto p-4">
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-                <table className="w-full text-sm">
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <table className="w-full text-sm border-collapse">
                   <thead className="bg-gray-800 text-white sticky top-0 z-10">
                     <tr>
                       <th className="p-3 w-10">
-                        <input type="checkbox" onChange={(e) => setImportItems(prev => prev.map(i => ({ ...i, isChecked: e.target.checked })))} />
+                        <input 
+                          type="checkbox" 
+                          onChange={(e) => setImportItems(prev => prev.map(i => ({ ...i, isChecked: e.target.checked })))} 
+                        />
                       </th>
                       <th className="p-3 text-left">Data</th>
-                      <th className="p-3 text-left">Descrição</th>
+                      <th className="p-3 text-left">Descrição no Extrato</th>
                       <th className="p-3 text-right">Valor</th>
-                      <th className="p-3 text-left">Categoria</th>
+                      <th className="p-3 text-left">Classificação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {importItems.map(item => (
-                      <tr key={item.id} className={`${item.isPossibleDuplicate ? 'bg-amber-50' : 'hover:bg-gray-50'} ${!item.isChecked ? 'opacity-60' : ''}`}>
+                      <tr key={item.id} className={`${item.isPossibleDuplicate ? 'bg-amber-50/70' : 'hover:bg-gray-50'} transition-colors ${!item.isChecked ? 'opacity-60' : ''}`}>
                         <td className="p-3 text-center">
-                          <input type="checkbox" checked={item.isChecked} onChange={() => setImportItems(prev => prev.map(i => i.id === item.id ? { ...i, isChecked: !i.isChecked } : i))} />
+                          <input 
+                            type="checkbox" 
+                            checked={item.isChecked} 
+                            onChange={() => setImportItems(prev => prev.map(i => i.id === item.id ? { ...i, isChecked: !i.isChecked } : i))} 
+                          />
                         </td>
-                        <td className="p-3 font-mono">{new Date(item.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</td>
+                        <td className="p-3 font-mono whitespace-nowrap text-gray-500">
+                          {new Date(item.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                        </td>
                         <td className="p-3">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{item.description}</span>
-                            {/* Fixed: Wrapped AlertTriangle in a span with the title attribute as Lucide icons do not support a title prop directly */}
+                            <span className="font-medium text-gray-700">{item.description}</span>
                             {item.isPossibleDuplicate && (
-                              <span title="Possível duplicado">
-                                <AlertTriangle size={14} className="text-amber-500" />
+                              <span className="flex items-center gap-1 text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded" title="Possível duplicado">
+                                <AlertTriangle size={10} /> JÁ EXISTE
                               </span>
                             )}
                           </div>
@@ -314,7 +298,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                         </td>
                         <td className="p-3">
                           <select 
-                            className="w-full text-xs p-2 rounded border border-gray-200"
+                            className={`w-full text-xs p-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all ${item.selectedCategory ? 'border-indigo-200 bg-indigo-50/50' : 'border-gray-200'}`}
                             value={item.selectedCategory} 
                             onChange={(e) => {
                               const val = e.target.value;
@@ -322,7 +306,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                               setImportItems(prev => prev.map(p => p.id === item.id ? { ...p, selectedGroup: group, selectedCategory: val, isChecked: !!val } : p));
                             }}
                           >
-                            <option value="">-- Selecione --</option>
+                            <option value="">-- Classificar como --</option>
                             {item.type === 'INCOME' ? (
                                 incomeCategories.map(c => <option key={c} value={c}>{c}</option>)
                             ) : (
@@ -343,17 +327,30 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           )}
         </div>
 
-        <div className="p-5 border-t bg-white flex justify-end gap-3">
-          {step === 'CLASSIFY' && (
-            <button onClick={() => setStep('UPLOAD')} className="px-6 py-2 text-gray-500 font-bold">Voltar</button>
-          )}
-          <button 
-            disabled={step === 'UPLOAD' || importItems.filter(i => i.isChecked && i.selectedCategory).length === 0}
-            onClick={handleConfirm} 
-            className="px-10 py-2 bg-indigo-600 disabled:bg-gray-300 text-white font-bold rounded-xl shadow hover:bg-indigo-700"
-          >
-            Concluir ({importItems.filter(i => i.isChecked && i.selectedCategory).length})
-          </button>
+        {/* Footer Area */}
+        <div className="p-5 border-t bg-white shrink-0 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="text-xs text-gray-500 flex items-center gap-4">
+            {step === 'CLASSIFY' && (
+              <>
+                <span className="flex items-center gap-1"><Wand2 size={12}/> Sugestões aplicadas</span>
+                <span><strong>{importItems.filter(i => i.isChecked).length}</strong> de {importItems.length} selecionados</span>
+              </>
+            )}
+          </div>
+          <div className="flex gap-3 w-full sm:w-auto">
+            {step === 'CLASSIFY' && (
+              <button onClick={() => setStep('UPLOAD')} className="flex-1 sm:flex-none px-6 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">
+                Reiniciar
+              </button>
+            )}
+            <button 
+              disabled={step === 'UPLOAD' || importItems.filter(i => i.isChecked && i.selectedCategory).length === 0}
+              onClick={handleConfirm} 
+              className="flex-1 sm:flex-none px-10 py-2.5 bg-indigo-600 disabled:bg-gray-300 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Check size={18} /> Confirmar Importação
+            </button>
+          </div>
         </div>
       </div>
     </div>
