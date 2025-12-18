@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Upload, AlertCircle, AlertTriangle, FileText, Check, Tag } from 'lucide-react';
+import { X, Upload, AlertCircle, AlertTriangle, FileText, Check } from 'lucide-react';
 import type { ImportItem, CategoryStructure, TransactionType, Transaction } from './types';
 import * as XLSX from 'xlsx';
 
@@ -24,6 +24,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
   if (!isOpen) return null;
 
   const getCleanDescription = (fullDesc: string) => {
+    // Remove padrões de data/hora comuns em extratos (ex: 21/10 13:42)
     const datePattern = /\d{2}\/\d{2}(?:\s\d{2}:\d{2})?/;
     const match = fullDesc.match(datePattern);
     if (match && match.index !== undefined) {
@@ -54,19 +55,28 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         return itemDescLower.includes(descLower) || descLower.includes(itemDescLower);
       });
 
-      // 2. Busca no Histórico para Sugestão (Aprendizado) se não for duplicado exato
-      const historyMatch = duplicateMatch || existingTransactions.find(ex => {
+      // 2. Busca no Histórico para Sugestão Inteligente (Aprendizado)
+      // Se não for duplicado, procuramos transações antigas que tenham o mesmo "texto de banco" na observação
+      const historyMatch = duplicateMatch || [...existingTransactions].reverse().find(ex => {
         if (!ex.group) return false;
-        const historyDesc = ex.description.toLowerCase().trim();
-        return itemCleaned === historyDesc || 
-               (itemCleaned.includes(historyDesc) && historyDesc.length > 3) ||
-               (historyDesc.includes(itemCleaned) && itemCleaned.length > 3);
+        
+        let historicalBankText = '';
+        if (ex.observation?.toLowerCase().includes('importado:')) {
+          historicalBankText = ex.observation.split(/importado:/i)[1]?.toLowerCase().trim() || '';
+        }
+
+        // Tenta casar o texto limpo atual com o texto de banco gravado anteriormente ou com a descrição
+        const matchTarget = historicalBankText || ex.description.toLowerCase().trim();
+        
+        return itemCleaned === matchTarget || 
+               (itemCleaned.length > 5 && matchTarget.includes(itemCleaned)) ||
+               (matchTarget.length > 5 && itemCleaned.includes(matchTarget));
       });
 
       return {
         ...item,
         isPossibleDuplicate: !!duplicateMatch,
-        isChecked: false,
+        isChecked: false, // Mantém desmarcado para conferência manual
         selectedGroup: historyMatch?.group || (item.type === 'INCOME' ? 'Receitas' : (expenseGroups[0]?.name || '')),
         selectedCategory: historyMatch?.description || ''
       };
@@ -265,12 +275,12 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                       <th className="p-3 text-left">Data</th>
                       <th className="p-3 text-left">Descrição no Extrato</th>
                       <th className="p-3 text-right">Valor</th>
-                      <th className="p-3 text-left rounded-tr-xl">Classificação Sugerida</th>
+                      <th className="p-3 text-left rounded-tr-xl">Classificação</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {importItems.map(item => (
-                      <tr key={item.id} className={`${item.isPossibleDuplicate ? 'bg-amber-100/80' : 'hover:bg-gray-50'} transition-colors ${!item.isChecked ? 'opacity-70' : ''}`}>
+                      <tr key={item.id} className={`${item.isPossibleDuplicate ? 'bg-amber-100/70' : 'hover:bg-gray-50'} transition-colors ${!item.isChecked ? 'opacity-75' : ''}`}>
                         <td className="p-3 text-center">
                           <input 
                             type="checkbox" 
@@ -282,28 +292,21 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                           {new Date(item.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                         </td>
                         <td className="p-3">
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-700">{item.description}</span>
-                              {item.isPossibleDuplicate && (
-                                <span className="flex items-center gap-1 text-[9px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded shadow-sm shrink-0">
-                                  <AlertTriangle size={10} /> JÁ IMPORTADO
-                                </span>
-                              )}
-                            </div>
-                            {item.selectedCategory && (
-                              <div className="flex items-center gap-1 text-[10px] text-indigo-600 font-bold mt-1 bg-indigo-50 w-fit px-1.5 py-0.5 rounded border border-indigo-100">
-                                <Tag size={10} /> {item.isPossibleDuplicate ? 'Classificação Anterior:' : 'Sugestão Histórica:'} {item.selectedCategory}
-                              </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-700 leading-tight">{item.description}</span>
+                            {item.isPossibleDuplicate && (
+                              <span className="flex items-center gap-1 text-[9px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded shadow-sm shrink-0 uppercase">
+                                <AlertTriangle size={10} /> Já Existe
+                              </span>
                             )}
                           </div>
                         </td>
-                        <td className={`p-3 text-right font-mono font-bold ${item.type === 'EXPENSE' ? 'text-red-600' : 'text-green-600'}`}>
+                        <td className={`p-3 text-right font-mono font-bold whitespace-nowrap ${item.type === 'EXPENSE' ? 'text-red-600' : 'text-green-600'}`}>
                           {item.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </td>
                         <td className="p-3">
                           <select 
-                            className={`w-full text-xs p-2 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all ${item.selectedCategory ? 'border-indigo-200 bg-white' : 'border-gray-200 bg-white'}`}
+                            className={`w-full text-xs p-1.5 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none transition-all ${item.selectedCategory ? 'border-indigo-200 bg-white font-semibold text-indigo-700' : 'border-gray-200 bg-white'}`}
                             value={item.selectedCategory} 
                             onChange={(e) => {
                               const val = e.target.value;
@@ -311,7 +314,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                               setImportItems(prev => prev.map(p => p.id === item.id ? { ...p, selectedGroup: group, selectedCategory: val, isChecked: !!val } : p));
                             }}
                           >
-                            <option value="">-- Selecione a Categoria --</option>
+                            <option value="">-- Classificar --</option>
                             {item.type === 'INCOME' ? (
                                 incomeCategories.map(c => <option key={c} value={c}>{c}</option>)
                             ) : (
@@ -338,14 +341,14 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
             {step === 'CLASSIFY' && (
               <>
                 <span className="flex items-center gap-1 font-semibold text-amber-700"><AlertTriangle size={12}/> Amarelo: Lançamento já existente</span>
-                <span>Marcados para importar: <strong>{importItems.filter(i => i.isChecked).length}</strong></span>
+                <span>Selecionados: <strong>{importItems.filter(i => i.isChecked).length}</strong></span>
               </>
             )}
           </div>
           <div className="flex gap-3 w-full sm:w-auto">
             {step === 'CLASSIFY' && (
               <button onClick={() => setStep('UPLOAD')} className="flex-1 sm:flex-none px-6 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">
-                Trocar Arquivo
+                Mudar Arquivo
               </button>
             )}
             <button 
@@ -353,7 +356,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
               onClick={handleConfirm} 
               className="flex-1 sm:flex-none px-10 py-2.5 bg-indigo-600 disabled:bg-gray-300 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
             >
-              <Check size={18} /> Salvar Lançamentos Selecionados
+              <Check size={18} /> Salvar Selecionados
             </button>
           </div>
         </div>
