@@ -25,6 +25,7 @@ import CategoryManagerModal from './CategoryManagerModal';
 import BankImportModal from './BankImportModal';
 import CategoryDetailsModal from './CategoryDetailsModal';
 import ProjectionConfigModal from './ProjectionConfigModal';
+import SearchTransactionsModal from './SearchTransactionsModal';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -40,6 +41,7 @@ function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isProjectionModalOpen, setIsProjectionModalOpen] = useState(false);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [selectedCategoryDetails, setSelectedCategoryDetails] = useState<{name: string, group: string} | null>(null);
   const [modalInitialType, setModalInitialType] = useState<TransactionType>('EXPENSE');
   const [modalFixedDesc, setModalFixedDesc] = useState<string | undefined>(undefined);
@@ -142,11 +144,9 @@ function App() {
          await addTransaction(txData);
       }
       
-      // Sincronização imediata após qualquer alteração
       const updatedTxs = await fetchTransactions();
       setTransactions(updatedTxs);
       
-      // Fecha modais e limpa edição
       setIsModalOpen(false);
       setEditingTransaction(null);
     } catch (error) {
@@ -205,6 +205,11 @@ function App() {
   const handleCategoryClick = (category: string, group: string) => {
     setSelectedCategoryDetails({ name: category, group });
     setIsDetailsModalOpen(true);
+  };
+
+  const handleEditFromSearch = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setIsModalOpen(true);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={48} /></div>;
@@ -282,7 +287,7 @@ function App() {
         {activeTab === 'dashboard' ? (
           <Dashboard transactions={filteredTransactions} totalIncome={totalIncome} totalExpenses={totalExpenses} projectionSettings={projectionSettings} onOpenConfig={() => setIsProjectionModalOpen(true)} />
         ) : (
-          <BudgetTable transactions={filteredTransactions} totalIncome={totalIncome} onOpenModalFor={openSpecificModal} incomeCategories={incomeCategories} expenseGroups={expenseGroups} onManageCategories={() => setIsCategoryModalOpen(true)} onOpenImport={() => setIsImportModalOpen(true)} onCategoryClick={handleCategoryClick} />
+          <BudgetTable transactions={filteredTransactions} totalIncome={totalIncome} onOpenModalFor={openSpecificModal} incomeCategories={incomeCategories} expenseGroups={expenseGroups} onManageCategories={() => setIsCategoryModalOpen(true)} onOpenImport={() => setIsImportModalOpen(true)} onCategoryClick={handleCategoryClick} onOpenSearch={() => setIsSearchModalOpen(true)} />
         )}
       </main>
 
@@ -315,6 +320,14 @@ function App() {
         expenseGroups={expenseGroups} 
         currentSettings={projectionSettings} 
         onSave={(s: ProjectionSettings) => { setProjectionSettings(s); saveUserSettings(incomeCategories, expenseGroups, s); setIsProjectionModalOpen(false); }} 
+      />
+
+      <SearchTransactionsModal 
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        transactions={transactions}
+        onEdit={handleEditFromSearch}
+        onDelete={handleDeleteTransaction}
       />
     </div>
   );

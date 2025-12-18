@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Transaction, TransactionType, CategoryStructure } from './types';
-import { Settings, FileSpreadsheet, CreditCard } from 'lucide-react';
+import { Settings, FileSpreadsheet, CreditCard, Search } from 'lucide-react';
 
 interface BudgetTableProps {
   transactions: Transaction[];
@@ -12,6 +12,7 @@ interface BudgetTableProps {
   onManageCategories: () => void;
   onOpenImport: () => void;
   onCategoryClick: (category: string, group: string) => void;
+  onOpenSearch: () => void;
 }
 
 const BudgetTable: React.FC<BudgetTableProps> = ({ 
@@ -22,7 +23,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
   expenseGroups,
   onManageCategories,
   onOpenImport,
-  onCategoryClick
+  onCategoryClick,
+  onOpenSearch
 }) => {
   
   const formatCurrency = (val: number) => 
@@ -88,9 +90,12 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
       <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-4 rounded-xl shadow-md border border-gray-200">
          <div className="flex flex-col">
             <h3 className="text-gray-700 font-bold text-sm">Ferramentas de Gestão</h3>
-            <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Categorias e Importação de Arquivos</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Categorias, Busca e Importação</p>
          </div>
          <div className="flex flex-wrap gap-2 justify-center sm:justify-end w-full sm:w-auto">
+           <button onClick={onOpenSearch} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-bold hover:bg-indigo-100 transition-all shadow-sm">
+             <Search size={14} /> Pesquisar
+           </button>
            <button onClick={onManageCategories} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-900 transition-all shadow-sm">
              <Settings size={14} /> Categorias
            </button>
