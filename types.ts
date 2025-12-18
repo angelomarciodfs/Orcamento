@@ -1,3 +1,4 @@
+
 export type TransactionType = 'INCOME' | 'EXPENSE' | 'BALANCE' | 'EXTRA';
 
 export interface Transaction {
@@ -18,14 +19,7 @@ export interface CategoryStructure {
 }
 
 export interface ProjectionSettings {
-  needs_items: string[]; // Items classified as Needs (50%)
-  // Items NOT in this list are considered Wants (30%) or others based on logic
-}
-
-export interface UserSettings {
-  income_categories: string[];
-  expense_groups: CategoryStructure[];
-  projection_settings?: ProjectionSettings;
+  needs_items: string[];
 }
 
 export interface ImportItem {

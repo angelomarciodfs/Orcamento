@@ -1,5 +1,6 @@
+
 import React from 'react';
-import type { Transaction, ProjectionSettings } from '../types';
+import type { Transaction, ProjectionSettings } from './types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Settings2 } from 'lucide-react';
 
@@ -13,15 +14,14 @@ interface DashboardProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#FF6B6B'];
 
-const Dashboard: React.FC<DashboardProps> = ({
-  transactions,
-  totalIncome,
+const Dashboard: React.FC<DashboardProps> = ({ 
+  transactions, 
+  totalIncome, 
   totalExpenses,
   projectionSettings,
   onOpenConfig
 }) => {
-
-  // Prepare data for Pie Chart
+  
   const expenseGroups = transactions
     .filter(t => t.type === 'EXPENSE')
     .reduce((acc, curr) => {
@@ -30,8 +30,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     }, {} as Record<string, number>);
 
   const pieData = Object.entries(expenseGroups).map(([name, value]) => ({ name, value }));
-
-  // Prepare data for Bar Chart
   const barData = [
     { name: 'Total', Receitas: totalIncome, Despesas: totalExpenses }
   ];
@@ -39,28 +37,22 @@ const Dashboard: React.FC<DashboardProps> = ({
   const balance = totalIncome - totalExpenses;
   const balanceColor = balance >= 0 ? 'text-green-600' : 'text-red-600';
 
-  // --- Projection Calculation ---
-
-  // 1. Dízimos (Always Specific group)
   const tithes = transactions
     .filter(t => t.group === 'Dízimos e Ofertas')
     .reduce((acc, t) => acc + t.amount, 0);
 
-  // 2. Necessidades Básicas (Based on User Settings)
   const needs = transactions
     .filter(t => t.type === 'EXPENSE' && projectionSettings.needs_items.includes(t.description))
     .reduce((acc, t) => acc + t.amount, 0);
 
-  // 3. Lazer / Desejos (Everything else that is expense, not tithe, and not need)
   const wants = transactions
-    .filter(t =>
-      t.type === 'EXPENSE' &&
-      t.group !== 'Dízimos e Ofertas' &&
+    .filter(t => 
+      t.type === 'EXPENSE' && 
+      t.group !== 'Dízimos e Ofertas' && 
       !projectionSettings.needs_items.includes(t.description)
     )
     .reduce((acc, t) => acc + t.amount, 0);
 
-  // 4. Poupança / Investimentos (10%) - Result Final
   const savings = balance;
 
   const calcPercent = (val: number) => {
@@ -69,42 +61,16 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const projectionRows = [
-    {
-       label: "DÍZIMO - 10%",
-       actual: tithes,
-       percent: calcPercent(tithes),
-       target: 10,
-       color: "bg-yellow-50 text-yellow-800"
-    },
-    {
-       label: "NECESSIDADES BÁSICAS - 50%",
-       actual: needs,
-       percent: calcPercent(needs),
-       target: 50,
-       color: "bg-blue-50 text-blue-800"
-    },
-    {
-       label: "LAZER / DESEJOS - 30%",
-       actual: wants,
-       percent: calcPercent(wants),
-       target: 30,
-       color: "bg-purple-50 text-purple-800"
-    },
-    {
-       label: "POUPANÇA / INVESTIMENTOS - 10%",
-       actual: savings,
-       percent: calcPercent(savings),
-       target: 10,
-       color: "bg-green-50 text-green-800"
-    }
+    { label: "DÍZIMO - 10%", actual: tithes, percent: calcPercent(tithes), target: 10, color: "bg-yellow-50 text-yellow-800" },
+    { label: "NECESSIDADES BÁSICAS - 50%", actual: needs, percent: calcPercent(needs), target: 50, color: "bg-blue-50 text-blue-800" },
+    { label: "LAZER / DESEJOS - 30%", actual: wants, percent: calcPercent(wants), target: 30, color: "bg-purple-50 text-purple-800" },
+    { label: "POUPANÇA / INVESTIMENTOS - 10%", actual: savings, percent: calcPercent(savings), target: 10, color: "bg-green-50 text-green-800" }
   ];
 
   const totalPercent = projectionRows.reduce((acc, row) => acc + row.percent, 0);
 
   return (
     <div className="space-y-6">
-
-      {/* Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col">
           <span className="text-sm font-medium text-gray-500 uppercase">Receita Total</span>
@@ -126,15 +92,10 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Projection Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-400 overflow-hidden relative">
          <div className="bg-amber-100 px-4 py-2 border-b border-amber-200 flex justify-between items-center">
             <span className="font-bold text-amber-900 uppercase">Projeção Financeira</span>
-            <button
-              onClick={onOpenConfig}
-              className="text-amber-800 hover:text-amber-900 hover:bg-amber-200 p-1.5 rounded transition-colors"
-              title="Configurar Categorias de Necessidades"
-            >
+            <button onClick={onOpenConfig} className="text-amber-800 hover:text-amber-900 hover:bg-amber-200 p-1.5 rounded transition-colors">
               <Settings2 size={18} />
             </button>
          </div>
@@ -156,9 +117,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <td className="px-4 py-2 text-right font-mono text-gray-900">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.actual)}
                       </td>
-                      <td className="px-4 py-2 text-center font-bold">
-                        {row.percent.toFixed(2)}%
-                      </td>
+                      <td className="px-4 py-2 text-center font-bold">{row.percent.toFixed(2)}%</td>
                     </tr>
                   ))}
                   <tr className="bg-black text-white font-bold">
@@ -172,10 +131,7 @@ const Dashboard: React.FC<DashboardProps> = ({
          </div>
       </div>
 
-      {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Pie Chart */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-gray-700 font-semibold mb-4 text-center">Despesas por Categoria</h3>
           <div className="h-64">
@@ -190,7 +146,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                     outerRadius={70}
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ value }) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
                   >
                     {pieData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -206,7 +161,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        {/* Bar Chart */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
            <h3 className="text-gray-700 font-semibold mb-4 text-center">Balanço do Mês</h3>
            <div className="h-64">

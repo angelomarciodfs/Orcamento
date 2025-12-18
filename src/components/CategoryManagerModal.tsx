@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Save, Edit2, Check, FolderOpen, Tag } from 'lucide-react';
-import type { CategoryStructure } from '../types';
+import type { CategoryStructure } from '../../types';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;

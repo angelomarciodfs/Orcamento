@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, AlertCircle, AlertTriangle } from 'lucide-react';
-import type { ImportItem, CategoryStructure, TransactionType, Transaction } from '../types';
+import type { ImportItem, CategoryStructure, TransactionType, Transaction } from '../../types';
 import * as XLSX from 'xlsx';
 
 interface BankImportModalProps {

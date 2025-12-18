@@ -1,5 +1,4 @@
 
-// @ts-ignore
 import { GoogleGenAI } from "@google/genai";
 
 export interface ReceiptData {
@@ -12,21 +11,8 @@ export interface ReceiptData {
 export const analyzeReceiptWithGemini = async (
   imageBase64: string
 ): Promise<ReceiptData> => {
-  // Verificação segura para evitar erro de 'process is not defined'
-  let apiKey = "";
-  try {
-    // @ts-ignore
-    apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
-  } catch (e) {
-    console.warn("Ambiente sem process.env definido");
-  }
-
-  if (!apiKey) {
-    throw new Error("API Key do Gemini não configurada.");
-  }
-
-  // @ts-ignore
-  const ai = new GoogleGenAI({ apiKey });
+  // A inicialização deve usar estritamente process.env.API_KEY como parâmetro nomeado
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const cleanBase64 = imageBase64.split(',')[1] || imageBase64;
@@ -43,25 +29,32 @@ export const analyzeReceiptWithGemini = async (
           },
           {
             text: `
-              Analise esta imagem de um comprovante fiscal brasileiro.
-              Retorne APENAS um JSON:
+              Analise esta imagem de um comprovante fiscal ou recibo brasileiro.
+              Extraia as seguintes informações em formato JSON estrito, sem markdown:
               {
                 "date": "YYYY-MM-DD",
                 "amount": 0.00,
-                "description": "Nome do Local",
-                "categoryHint": "Categoria Sugerida"
+                "description": "Nome do Estabelecimento",
+                "categoryHint": "Sugestão de Categoria"
               }
+              Responda APENAS o JSON.
             `
           }
         ]
       },
     });
 
-    const text = response.text || "";
+    // O texto deve ser acessado via propriedade .text, nunca como método .text()
+    const text = response.text;
+    
+    if (!text) {
+      throw new Error("A IA não retornou resposta.");
+    }
+    
     const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(jsonString) as ReceiptData;
   } catch (error) {
-    console.error("Erro Gemini:", error);
-    throw new Error("Falha na análise da IA.");
+    console.error("Erro no Gemini Service:", error);
+    throw new Error("Falha ao analisar o comprovante.");
   }
 };

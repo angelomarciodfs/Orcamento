@@ -13,7 +13,8 @@ export default defineConfig({
         'lucide-react',
         'recharts',
         'xlsx',
-        '@google/genai'
+        '@google/genai',
+        '@supabase/supabase-js'
       ],
       output: {
         globals: {
@@ -22,7 +23,8 @@ export default defineConfig({
           'lucide-react': 'LucideReact',
           'recharts': 'Recharts',
           'xlsx': 'XLSX',
-          '@google/genai': 'GoogleGenAI'
+          '@google/genai': 'GoogleGenAI',
+          '@supabase/supabase-js': 'Supabase'
         }
       }
     }

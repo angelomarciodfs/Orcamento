@@ -24,5 +24,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "geminiService.ts", "App.tsx"]
+  "include": ["src", "geminiService.ts", "App.tsx", "constants.ts", "storageService.ts", "types.ts", "Dashboard.tsx", "BudgetTable.tsx", "TransactionModal.tsx"]
 }

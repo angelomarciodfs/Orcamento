@@ -1,6 +1,6 @@
 
 import React from 'react';
-import type { Transaction, TransactionType, CategoryStructure } from '../types';
+import type { Transaction, TransactionType, CategoryStructure } from './types';
 import { Settings, FileSpreadsheet, CreditCard } from 'lucide-react';
 
 interface BudgetTableProps {
@@ -46,10 +46,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
 
   const santanderBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Santander').reduce((acc, t) => acc + t.amount, 0);
   const bbBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Banco do Brasil').reduce((acc, t) => acc + t.amount, 0);
-  const interBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Banco Inter').reduce((acc, t) => acc + t.amount, 0);
-
+  
   const totalBancario = santanderBalance + bbBalance + resultFinal + extraIncome;
-  const totalFinanceiro = totalBancario + interBalance;
 
   const cellBase = "px-2 py-1 border-r border-gray-300 text-sm flex items-center";
   const cellValue = "px-2 py-1 border-r border-gray-300 text-sm text-right font-mono flex items-center justify-end";
@@ -80,7 +78,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
         )}
       </div>
       <div className={cellPercent}>
-        {value !== undefined && !isGroupHeader && !['Receita Extra', 'Santander', 'Banco do Brasil', 'Banco Inter'].includes(label) ? calcPercent(value) : ''}
+        {value !== undefined && !isGroupHeader && !['Receita Extra', 'Santander', 'Banco do Brasil'].includes(label) ? calcPercent(value) : ''}
       </div>
     </div>
   );
@@ -169,12 +167,6 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
            <div className="px-2 py-1 uppercase">TOTAL BANCÁRIO</div>
            <div className="px-2 py-1 text-right font-mono">{formatCurrency(totalBancario)}</div>
            <div className="px-2 py-1"></div>
-        </div>
-
-        <div className="grid grid-cols-[1fr_140px_80px] bg-[#31869b] text-white font-bold border-t-2 border-gray-800 mt-2 text-lg">
-           <div className="px-2 py-2 uppercase">TOTAL FINANCEIRO</div>
-           <div className="px-2 py-2 text-right font-mono">{formatCurrency(totalFinanceiro)}</div>
-           <div className="px-2 py-2"></div>
         </div>
       </div>
     </div>

@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  LayoutDashboard, 
   PlusCircle, 
   LogOut, 
   ChevronLeft, 
   ChevronRight,
-  Loader2,
-  Calendar
+  Loader2
 } from 'lucide-react';
-import type { Transaction, TransactionType, CategoryStructure, ImportItem, ProjectionSettings } from './src/types';
+import type { Transaction, TransactionType, CategoryStructure, ImportItem, ProjectionSettings } from './types';
 import { 
   fetchTransactions, 
   addTransaction, 
@@ -19,8 +17,8 @@ import {
   saveUserSettings, 
   signOut 
 } from './storageService';
-import { supabase } from './src/supabaseClient';
-import { MONTHS, NEEDS_ITEMS } from './src/constants';
+import { supabase } from './supabaseClient';
+import { MONTHS, NEEDS_ITEMS } from './constants';
 import TransactionModal from './TransactionModal';
 import BudgetTable from './BudgetTable';
 import Dashboard from './Dashboard';
@@ -167,7 +165,6 @@ function App() {
     }
   };
 
-  // Added missing handleImportItems to process items from BankImportModal
   const handleImportItems = async (items: ImportItem[]) => {
     setDataLoading(true);
     try {

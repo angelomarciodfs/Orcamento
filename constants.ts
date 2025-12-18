@@ -1,6 +1,6 @@
+
 import type { CategoryStructure } from './types';
 
-// Based on the user's prompt structure
 export const INITIAL_INCOME_CATEGORIES: string[] = [
   'Receita Ângelo',
   'Receita Flávia',
@@ -48,15 +48,13 @@ export const MONTHS = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
 ];
 
-// Items that fall under "Necessidades Básicas" (50%)
 export const NEEDS_ITEMS = [
-  'Financiamento', 'Condomínio', 'Energia', 'Água', 'Internet',
+  'Financiamento', 'Condomínio', 'Energia', 'Água', 'Internet', 
   'Telefone', 'IPTU', 'Combustível', 'Plano de Saúde', 'Mercado', 'Remédios'
 ];
 
-// Items that fall under "Lazer / Desejos" (30%)
 export const WANTS_ITEMS = [
-  'Cartão de Crédito', 'Restaurantes/iFood', 'Cinema/Teatro', 'Passeios',
-  'Viagens', 'Aniversários', 'Presentes', 'Salão de Beleza', 'Consórcio',
+  'Cartão de Crédito', 'Restaurantes/iFood', 'Cinema/Teatro', 'Passeios', 
+  'Viagens', 'Aniversários', 'Presentes', 'Salão de Beleza', 'Consórcio', 
   'Diversos/Despesas Extras', 'Outros', 'Uber/99'
 ];
