@@ -21,6 +21,7 @@ interface TransactionModalProps {
   editingTransaction?: Transaction | null;
   incomeCategories: string[];
   expenseGroups: CategoryStructure[];
+  selectedMonth: Date;
 }
 
 const TransactionModal: React.FC<TransactionModalProps> = ({ 
@@ -32,7 +33,8 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   fixedGroup,
   editingTransaction,
   incomeCategories,
-  expenseGroups
+  expenseGroups,
+  selectedMonth
 }) => {
   const [type, setType] = useState<TransactionType>(initialType);
   const [group, setGroup] = useState<string>('');
@@ -40,7 +42,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [isCustomDescription, setIsCustomDescription] = useState(false);
   const [amount, setAmount] = useState<string>(''); 
   const [isNegative, setIsNegative] = useState(false);
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>('');
   const [observation, setObservation] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -83,7 +85,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         setType(editingTransaction.type);
         setGroup(editingTransaction.group);
         
-        // Verifica se a descrição está na lista pré-definida
         const currentGroupItems = editingTransaction.type === 'INCOME' 
             ? incomeCategories 
             : expenseGroups.find(g => g.name === editingTransaction.group)?.items || [];
@@ -99,11 +100,17 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         }
         setObservation(editingTransaction.observation || '');
       } else {
+        // Cálculo da data padrão (último dia do mês selecionado)
+        const year = selectedMonth.getFullYear();
+        const month = selectedMonth.getMonth();
+        const lastDayDate = new Date(year, month + 1, 0); // O dia 0 do próximo mês é o último do atual
+        const formattedDate = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
+        
+        setDate(formattedDate);
         setType(initialType);
         setAmount('');
-        setIsNegative(initialType === 'EXPENSE'); // Sugere negativo se for despesa
+        setIsNegative(initialType === 'EXPENSE');
         setObservation('');
-        setDate(new Date().toISOString().split('T')[0]);
         setIsCustomDescription(false);
         
         if (fixedDescription) {
@@ -127,7 +134,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         }
       }
     }
-  }, [isOpen, editingTransaction, initialType, fixedDescription, fixedGroup]);
+  }, [isOpen, editingTransaction, initialType, fixedDescription, fixedGroup, selectedMonth]);
 
   const handleStartSplit = () => {
     const totalVal = parseCurrency(amount);

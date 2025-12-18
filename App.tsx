@@ -216,6 +216,35 @@ function App() {
     setIsModalOpen(true);
   };
 
+  // Funções de salvamento de configurações para garantir sincronia
+  const handleSettingsSave = async (inc: string[], exp: CategoryStructure[], banks: string[], invs: string[]) => {
+    try {
+      // 1. Salva no Supabase
+      await saveUserSettings(inc, exp, projectionSettings, banks, invs);
+      
+      // 2. Atualiza o estado local imediatamente
+      setIncomeCategories(inc);
+      setExpenseGroups(exp);
+      setBankList(banks);
+      setInvestmentList(invs);
+      
+      setIsCategoryModalOpen(false);
+      console.log("Configurações atualizadas com sucesso!");
+    } catch (error) {
+      alert("Houve um erro ao salvar as configurações. Verifique o console.");
+    }
+  };
+
+  const handleProjectionSave = async (s: ProjectionSettings) => {
+    try {
+      await saveUserSettings(incomeCategories, expenseGroups, s, bankList, investmentList);
+      setProjectionSettings(s);
+      setIsProjectionModalOpen(false);
+    } catch (error) {
+      alert("Erro ao salvar projeção.");
+    }
+  };
+
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={48} /></div>;
 
   if (!session) {
@@ -240,7 +269,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <header className="bg-gray-800 text-white p-4 flex justify-between items-center sticky top-0 z-30">
-        <h1 className="font-bold text-lg">Orçamento Pessoal</h1>
+        <h1 className="font-bold text-lg">Orçamento Pessoal Pro</h1>
         <button onClick={handleLogout} className="text-gray-400 hover:text-white"><LogOut size={20} /></button>
       </header>
       
@@ -307,7 +336,18 @@ function App() {
         )}
       </main>
 
-      <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveTransaction} initialType={modalInitialType} fixedDescription={modalFixedDesc} fixedGroup={modalFixedGroup} incomeCategories={incomeCategories} expenseGroups={expenseGroups} editingTransaction={editingTransaction} />
+      <TransactionModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSave={handleSaveTransaction} 
+        initialType={modalInitialType} 
+        fixedDescription={modalFixedDesc} 
+        fixedGroup={modalFixedGroup} 
+        incomeCategories={incomeCategories} 
+        expenseGroups={expenseGroups} 
+        editingTransaction={editingTransaction}
+        selectedMonth={currentDate}
+      />
       
       {selectedCategoryDetails && (
         <CategoryDetailsModal 
@@ -327,14 +367,7 @@ function App() {
         expenseGroups={expenseGroups} 
         bankList={bankList}
         investmentList={investmentList}
-        onSave={(inc: string[], exp: CategoryStructure[], banks: string[], invs: string[]) => { 
-          setIncomeCategories(inc); 
-          setExpenseGroups(exp); 
-          setBankList(banks);
-          setInvestmentList(invs);
-          saveUserSettings(inc, exp, projectionSettings, banks, invs); 
-          setIsCategoryModalOpen(false); 
-        }} 
+        onSave={handleSettingsSave} 
       />
       
       <BankImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleImportItems} expenseGroups={expenseGroups} incomeCategories={incomeCategories} existingTransactions={transactions} />
@@ -344,7 +377,7 @@ function App() {
         onClose={() => setIsProjectionModalOpen(false)} 
         expenseGroups={expenseGroups} 
         currentSettings={projectionSettings} 
-        onSave={(s: ProjectionSettings) => { setProjectionSettings(s); saveUserSettings(incomeCategories, expenseGroups, s, bankList, investmentList); setIsProjectionModalOpen(false); }} 
+        onSave={handleProjectionSave} 
       />
 
       <SearchTransactionsModal 
