@@ -37,6 +37,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [type, setType] = useState<TransactionType>(initialType);
   const [group, setGroup] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [isCustomDescription, setIsCustomDescription] = useState(false);
   const [amount, setAmount] = useState<string>(''); 
   const [isNegative, setIsNegative] = useState(false);
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -68,6 +69,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     setAmount(formatCurrency(floatValue));
   };
 
+  const availableDescriptions = type === 'INCOME' 
+    ? incomeCategories 
+    : expenseGroups.find(g => g.name === group)?.items || [];
+
   useEffect(() => {
     if (isOpen) {
       setIsSubmitting(false);
@@ -77,7 +82,16 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       if (editingTransaction) {
         setType(editingTransaction.type);
         setGroup(editingTransaction.group);
+        
+        // Verifica se a descrição está na lista pré-definida
+        const currentGroupItems = editingTransaction.type === 'INCOME' 
+            ? incomeCategories 
+            : expenseGroups.find(g => g.name === editingTransaction.group)?.items || [];
+        
+        const isKnown = currentGroupItems.includes(editingTransaction.description);
+        setIsCustomDescription(!isKnown);
         setDescription(editingTransaction.description);
+
         setAmount(formatCurrency(Math.abs(editingTransaction.amount)));
         setIsNegative(editingTransaction.amount < 0);
         if (editingTransaction.date) {
@@ -87,9 +101,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       } else {
         setType(initialType);
         setAmount('');
-        setIsNegative(false);
+        setIsNegative(initialType === 'EXPENSE'); // Sugere negativo se for despesa
         setObservation('');
         setDate(new Date().toISOString().split('T')[0]);
+        setIsCustomDescription(false);
         
         if (fixedDescription) {
           setDescription(fixedDescription);
@@ -112,7 +127,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         }
       }
     }
-  }, [isOpen, initialType, fixedDescription, fixedGroup, incomeCategories, expenseGroups, editingTransaction]);
+  }, [isOpen, editingTransaction, initialType, fixedDescription, fixedGroup]);
 
   const handleStartSplit = () => {
     const totalVal = parseCurrency(amount);
@@ -174,7 +189,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
     if (isSplitMode) {
       if (Math.abs(splitDifference) > 0.01) {
-        alert(`A soma das divisões (${formatCurrency(currentSplitsTotal)}) deve ser igual ao valor total (${formatCurrency(totalToSplit)}). Diferença: ${formatCurrency(splitDifference)}`);
+        alert(`A soma das divisões deve ser igual ao valor total.`);
         return;
       }
     }
@@ -205,6 +220,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
               date,
               observation
             };
+            
             if (editingTransaction) {
               await onSave({ ...payload, id: editingTransaction.id });
             } else {
@@ -214,7 +230,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         onClose();
     } catch (error) {
         console.error("Erro ao salvar:", error);
-        alert("Ocorreu um erro ao salvar o lançamento.");
     } finally {
         setIsSubmitting(false);
     }
@@ -240,9 +255,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       setIsNegative(data.amount < 0);
                   }
                   if (data.description) setDescription(data.description);
-                  if (data.categoryHint && type === 'EXPENSE') {
-                      setObservation(`IA Sugeriu: ${data.categoryHint}`);
-                  }
               } catch (err) {
                   alert("Erro ao analisar imagem.");
               } finally {
@@ -258,10 +270,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   if (!isOpen) return null;
 
-  const availableDescriptions = type === 'INCOME' 
-    ? incomeCategories 
-    : expenseGroups.find(g => g.name === group)?.items || [];
-
   const isSpecialType = type === 'BALANCE' || type === 'EXTRA';
 
   return (
@@ -271,13 +279,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         {isAnalyzing && (
             <div className="absolute inset-0 bg-white bg-opacity-90 z-20 flex flex-col items-center justify-center text-indigo-600">
                 <Loader2 size={48} className="animate-spin mb-2" />
-                <p className="font-semibold animate-pulse">Lendo comprovante...</p>
+                <p className="font-semibold animate-pulse">IA lendo comprovante...</p>
             </div>
         )}
 
         <div className="flex justify-between items-center p-4 border-b shrink-0">
-          <h2 className="text-xl font-semibold text-gray-800">
-            {isSplitMode ? 'Dividir Lançamento' : (editingTransaction ? 'Editar Lançamento' : (fixedDescription ? `Lançar ${fixedDescription}` : `Nova ${type === 'INCOME' ? 'Receita' : 'Despesa'}`))}
+          <h2 className="text-xl font-bold text-gray-800">
+            {isSplitMode ? 'Dividir Lançamento' : (editingTransaction ? 'Editar Lançamento' : (fixedDescription ? `Lançar ${fixedDescription}` : `Novo Lançamento`))}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X size={24} />
@@ -287,10 +295,10 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
           
           {!fixedDescription && !editingTransaction && !isSplitMode && (
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2">
                 <div className="flex bg-gray-100 p-1 rounded-lg flex-1">
-                  <button type="button" className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${type === 'INCOME' ? 'bg-green-500 text-white shadow' : 'text-gray-600'}`} onClick={() => { setType('INCOME'); setGroup('Receitas'); }}>Receita</button>
-                  <button type="button" className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${type === 'EXPENSE' ? 'bg-red-500 text-white shadow' : 'text-gray-600'}`} onClick={() => { setType('EXPENSE'); if(expenseGroups.length > 0) { setGroup(expenseGroups[0].name); setDescription(expenseGroups[0].items[0] || ''); } }}>Despesa</button>
+                  <button type="button" className={`flex-1 py-2 rounded-md text-sm font-bold transition-colors ${type === 'INCOME' ? 'bg-green-500 text-white shadow' : 'text-gray-600'}`} onClick={() => { setType('INCOME'); setGroup('Receitas'); }}>Receita</button>
+                  <button type="button" className={`flex-1 py-2 rounded-md text-sm font-bold transition-colors ${type === 'EXPENSE' ? 'bg-red-500 text-white shadow' : 'text-gray-600'}`} onClick={() => { setType('EXPENSE'); if(expenseGroups.length > 0) { setGroup(expenseGroups[0].name); setDescription(expenseGroups[0].items[0] || ''); } }}>Despesa</button>
                 </div>
                 <button type="button" onClick={handleCameraClick} className="px-3 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 flex flex-col items-center justify-center"><Camera size={20} /><span className="text-[10px] font-bold">SCAN</span></button>
                 <input type="file" accept="image/*" capture="environment" ref={fileInputRef} className="hidden" onChange={handleFileChange} />
@@ -327,24 +335,44 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                     )}
                     <div>
                       <label className="block text-xs font-bold text-gray-500 uppercase mb-1">{type === 'INCOME' ? 'Fonte' : 'Item'}</label>
-                      <select value={description} onChange={(e) => setDescription(e.target.value)} className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500">
+                      <select 
+                        value={isCustomDescription ? 'custom' : description} 
+                        onChange={(e) => {
+                            if (e.target.value === 'custom') {
+                                setIsCustomDescription(true);
+                            } else {
+                                setIsCustomDescription(false);
+                                setDescription(e.target.value);
+                            }
+                        }} 
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                      >
                         {availableDescriptions.map(item => <option key={item} value={item}>{item}</option>)}
                         <option value="custom">Outro (Digitar...)</option>
                       </select>
-                      {description === 'custom' && <input type="text" placeholder="Descrição personalizada" className="mt-2 w-full px-3 py-2 border rounded-lg" onChange={(e) => setDescription(e.target.value)} />}
+                      {isCustomDescription && (
+                        <input 
+                            type="text" 
+                            autoFocus
+                            placeholder="Descreva o lançamento..." 
+                            value={description === 'custom' ? '' : description}
+                            className="mt-2 w-full px-3 py-2 border rounded-lg border-indigo-300 bg-indigo-50" 
+                            onChange={(e) => setDescription(e.target.value)} 
+                        />
+                      )}
                     </div>
                   </>
                 )}
-                {fixedDescription && <div className="bg-gray-100 p-3 rounded-lg text-center font-bold text-gray-700 border border-gray-200">{fixedDescription}</div>}
+                {fixedDescription && <div className="bg-indigo-50 p-3 rounded-lg text-center font-bold text-indigo-800 border border-indigo-100">{fixedDescription}</div>}
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Observação</label>
                   <textarea value={observation} onChange={(e) => setObservation(e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg" />
                 </div>
                 
                 {editingTransaction && (
-                  <button type="button" onClick={handleStartSplit} className="w-full py-2 px-4 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50 font-semibold flex items-center justify-center gap-2 transition-colors">
+                  <button type="button" onClick={handleStartSplit} className="w-full py-2 px-4 border-2 border-dashed border-indigo-200 text-indigo-500 rounded-lg hover:bg-indigo-50 font-bold flex items-center justify-center gap-2 transition-colors">
                     <Calculator size={18} />
-                    Dividir este lançamento em várias categorias
+                    Dividir lançamento em várias categorias
                   </button>
                 )}
               </>
@@ -365,13 +393,13 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                       <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-[10px] font-bold text-gray-400 uppercase">Grupo</label>
-                          <select value={s.group} onChange={(e) => updateSplitLine(s.id, 'group', e.target.value)} className="w-full p-1 text-sm border rounded">
+                          <select value={s.group} onChange={(e) => updateSplitLine(s.id, 'group', e.target.value)} className="w-full p-1 text-xs border rounded">
                              {type === 'INCOME' ? <option value="Receitas">Receitas</option> : expenseGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
                           </select>
                         </div>
                         <div>
                           <label className="text-[10px] font-bold text-gray-400 uppercase">Categoria</label>
-                          <select value={s.description} onChange={(e) => updateSplitLine(s.id, 'description', e.target.value)} className="w-full p-1 text-sm border rounded">
+                          <select value={s.description} onChange={(e) => updateSplitLine(s.id, 'description', e.target.value)} className="w-full p-1 text-xs border rounded">
                              {(type === 'INCOME' ? incomeCategories : (expenseGroups.find(g => g.name === s.group)?.items || [])).map(item => <option key={item} value={item}>{item}</option>)}
                           </select>
                         </div>
@@ -396,7 +424,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 </button>
 
                 <button type="button" onClick={() => setIsSplitMode(false)} className="w-full py-1 text-xs text-indigo-600 font-medium hover:underline">
-                  Cancelar divisão e voltar ao normal
+                  Cancelar divisão
                 </button>
               </div>
             )}
@@ -404,9 +432,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         </form>
 
         <div className="p-4 border-t bg-gray-50 shrink-0">
-          <button type="submit" disabled={isSubmitting} onClick={handleSubmit} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2">
+          <button type="submit" disabled={isSubmitting} onClick={handleSubmit} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-lg shadow-lg transition-colors flex items-center justify-center gap-2">
             {isSubmitting && <Loader2 size={18} className="animate-spin" />}
-            {isSplitMode ? 'Confirmar Divisão' : (editingTransaction ? 'Atualizar Lançamento' : 'Salvar')}
+            {isSplitMode ? 'Confirmar Divisão' : (editingTransaction ? 'Salvar Alterações' : 'Salvar Lançamento')}
           </button>
         </div>
       </div>

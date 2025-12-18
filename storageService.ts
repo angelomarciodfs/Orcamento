@@ -23,9 +23,21 @@ export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Prom
 export const updateTransaction = async (id: string, updates: Partial<Transaction>): Promise<Transaction | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
-  const { data, error } = await supabase.from('transactions').update(updates).eq('id', id).eq('user_id', user.id).select();
+  
+  // Remove o ID do objeto de atualização para evitar erro de 'Primary Key update'
+  const { id: _, created_at: __, user_id: ___, ...dataToUpdate } = updates as any;
+  
+  const { data, error } = await supabase.from('transactions')
+    .update(dataToUpdate)
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .select();
+
   if (data && data.length > 0) return data[0];
-  if (error) console.error("Erro ao atualizar:", error);
+  if (error) {
+    console.error("Erro ao atualizar transação:", error);
+    throw error;
+  }
   return null;
 };
 
