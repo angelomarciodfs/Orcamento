@@ -114,8 +114,8 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
     } else {
         const reader = new FileReader();
         reader.onload = (event) => {
-            const text = event.target?.result as string;
-            parseCSV(text);
+            const content = event.target?.result as string;
+            parseCSV(content);
         };
         reader.readAsText(file, 'ISO-8859-1');
     }
@@ -160,7 +160,14 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                 if (!dateIso) continue;
 
                 const description = String(row[colMap.desc] || '').trim();
-                if (!description || description.toLowerCase().includes('subtotal') || description.toLowerCase().includes('resumo') || description.toLowerCase().includes('saldo') || description.toLowerCase().includes('titular')) continue;
+                const descLower = description.toLowerCase();
+                
+                if (!description || 
+                    descLower.includes('subtotal') || 
+                    descLower.includes('resumo') || 
+                    descLower.includes('saldo') || 
+                    descLower.includes('titular') ||
+                    descLower.includes('limite')) continue;
 
                 let amount = 0;
                 let type: TransactionType = 'EXPENSE';

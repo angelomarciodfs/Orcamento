@@ -1,4 +1,4 @@
-
+// @ts-ignore
 import { GoogleGenAI } from "@google/genai";
 
 export interface ReceiptData {
@@ -11,14 +11,13 @@ export interface ReceiptData {
 export const analyzeReceiptWithGemini = async (
   imageBase64: string
 ): Promise<ReceiptData> => {
-  // Fix: Initialize the GoogleGenAI client with the API key from process.env.API_KEY
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // @ts-ignore
+  const apiKey = process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
-    // Remove header data:image/jpeg;base64, if present
     const cleanBase64 = imageBase64.split(',')[1] || imageBase64;
 
-    // Fix: Use ai.models.generateContent with the gemini-3-flash-preview model and correct multimodal parts structure
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: {
@@ -46,14 +45,12 @@ export const analyzeReceiptWithGemini = async (
       },
     });
 
-    // Fix: Extract generated text from the response object property (not a method)
     const text = response.text;
     
     if (!text) {
       throw new Error("A IA não retornou nenhum texto.");
     }
     
-    // Clean up markdown code blocks if Gemini sends them
     const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
     
     return JSON.parse(jsonString) as ReceiptData;
