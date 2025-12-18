@@ -36,6 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   // Agrupamento de despesas para o gráfico de pizza
   const pieData = useMemo(() => {
+    if (!transactions.length) return [];
     const groups = transactions
       .filter(t => t.type === 'EXPENSE')
       .reduce((acc, curr) => {
@@ -44,15 +45,17 @@ const Dashboard: React.FC<DashboardProps> = ({
         return acc;
       }, {} as Record<string, number>);
 
-    return Object.entries(groups).map(([name, value]) => ({ name, value }));
+    return Object.entries(groups)
+      .map(([name, value]) => ({ name, value }))
+      .filter(item => item.value > 0);
   }, [transactions]);
 
   // Dados para o gráfico de barras
   const barData = useMemo(() => [
-    { name: 'Saldo Atual', Receitas: totalIncome, Despesas: totalExpenses }
+    { name: 'Balanço', Receitas: totalIncome || 0, Despesas: totalExpenses || 0 }
   ], [totalIncome, totalExpenses]);
 
-  const balance = totalIncome - totalExpenses;
+  const balance = (totalIncome || 0) - (totalExpenses || 0);
   const balanceColor = balance >= 0 ? 'text-green-600' : 'text-red-600';
 
   // --- Cálculos de Projeção ---
@@ -77,7 +80,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const savings = balance;
 
   const calcPercent = (val: number) => {
-     if (totalIncome <= 0) return 0;
+     if (!totalIncome || totalIncome <= 0) return 0;
      return (val / totalIncome) * 100;
   };
 
@@ -101,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Receitas</span>
             <div className="text-xl font-bold text-green-600">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalIncome)}
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalIncome || 0)}
             </div>
           </div>
         </div>
@@ -112,7 +115,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Despesas</span>
             <div className="text-xl font-bold text-red-600">
-              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalExpenses)}
+              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalExpenses || 0)}
             </div>
           </div>
         </div>
@@ -183,7 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Gráficos em Grade */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px]">
           <div className="flex items-center gap-2 mb-6">
             <PieIcon size={20} className="text-indigo-500" />
             <h3 className="text-gray-800 font-bold uppercase text-sm">Gastos por Grupo</h3>
@@ -223,7 +226,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px]">
            <div className="flex items-center gap-2 mb-6">
             <BarChart3 size={20} className="text-indigo-500" />
             <h3 className="text-gray-800 font-bold uppercase text-sm">Balanço Mensal</h3>
@@ -233,7 +236,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                   <XAxis dataKey="name" hide />
-                  <YAxis hide />
+                  <YAxis />
                   <Tooltip 
                     cursor={{fill: '#f9fafb'}}
                     formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
