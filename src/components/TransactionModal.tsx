@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, Loader2, Plus, Minus, Trash2, Calculator } from 'lucide-react';
 import type { Transaction, TransactionType, CategoryStructure } from '../types';
-import { analyzeReceiptWithGemini } from '../services/geminiService';
+import { analyzeReceiptWithGemini } from '../../geminiService';
 
 interface SplitLine {
   id: string;

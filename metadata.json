@@ -1,0 +1,8 @@
+
+{
+  "name": "Orçamento Pessoal Pro",
+  "description": "Uma aplicação completa para controle de orçamento pessoal com categorização hierárquica, visualização de dados e cálculo de percentuais sobre receita.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
