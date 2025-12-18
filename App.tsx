@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  PlusCircle, 
   LogOut, 
   ChevronLeft, 
   ChevronRight,
@@ -30,7 +29,6 @@ import ProjectionConfigModal from './ProjectionConfigModal';
 function App() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [dataLoading, setDataLoading] = useState(false);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
@@ -53,22 +51,21 @@ function App() {
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    supabase.auth.getSession().then(({ data: { session: initialSession } }: any) => {
+      setSession(initialSession);
       setLoading(false);
-      if (session) loadUserData();
+      if (initialSession) loadUserData();
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) loadUserData();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, currentSession: any) => {
+      setSession(currentSession);
+      if (currentSession) loadUserData();
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const loadUserData = async () => {
-    setDataLoading(true);
     try {
       const [txs, settings] = await Promise.all([
         fetchTransactions(),
@@ -80,8 +77,6 @@ function App() {
       setProjectionSettings(settings.projection);
     } catch (error) {
       console.error("Erro ao carregar dados", error);
-    } finally {
-      setDataLoading(false);
     }
   };
 
@@ -128,7 +123,6 @@ function App() {
   };
 
   const handleSaveTransaction = async (txData: any) => {
-    setDataLoading(true);
     try {
       if (txData.isSplit) {
         if (txData.originalId) await deleteTransaction(txData.originalId);
@@ -150,23 +144,19 @@ function App() {
       await loadUserData();
     } catch (error) {
        console.error("Erro ao salvar:", error);
-       setDataLoading(false);
     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    setDataLoading(true);
     try {
       const success = await deleteTransaction(id);
       if (success) await loadUserData();
-      else setDataLoading(false);
     } catch (error) {
-      setDataLoading(false);
+      console.error("Erro ao deletar:", error);
     }
   };
 
   const handleImportItems = async (items: ImportItem[]) => {
-    setDataLoading(true);
     try {
       for (const item of items) {
         await addTransaction({
@@ -181,8 +171,6 @@ function App() {
       await loadUserData();
     } catch (error) {
       console.error("Erro ao importar lançamentos:", error);
-    } finally {
-      setDataLoading(false);
     }
   };
 
@@ -212,7 +200,7 @@ function App() {
   if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-        <div className="bg-white p-8 rounded-xl shadow-xl w-full max-w-md border border-gray-200">
+        <div className="bg-white p-8 rounded-xl shadow-xl w-full max-md border border-gray-200">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-gray-800">Orçamento Pessoal</h1>
           </div>
@@ -258,10 +246,35 @@ function App() {
       </main>
 
       <TransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveTransaction} initialType={modalInitialType} fixedDescription={modalFixedDesc} fixedGroup={modalFixedGroup} incomeCategories={incomeCategories} expenseGroups={expenseGroups} editingTransaction={editingTransaction} />
-      {selectedCategoryDetails && <CategoryDetailsModal isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} categoryName={selectedCategoryDetails.name} transactions={filteredTransactions.filter(t => t.description === selectedCategoryDetails.name && (selectedCategoryDetails.group ? t.group === selectedCategoryDetails.group : true))} onDelete={handleDeleteTransaction} onEdit={(tx) => { setIsDetailsModalOpen(false); setEditingTransaction(tx); setIsModalOpen(true); }} />}
-      <CategoryManagerModal isOpen={isCategoryModalOpen} onClose={() => setIsCategoryModalOpen(false)} incomeCategories={incomeCategories} expenseGroups={expenseGroups} onSave={(inc, exp) => { setIncomeCategories(inc); setExpenseGroups(exp); saveUserSettings(inc, exp, projectionSettings); setIsCategoryModalOpen(false); }} />
+      
+      {selectedCategoryDetails && (
+        <CategoryDetailsModal 
+          isOpen={isDetailsModalOpen} 
+          onClose={() => setIsDetailsModalOpen(false)} 
+          categoryName={selectedCategoryDetails.name} 
+          transactions={filteredTransactions.filter(t => t.description === selectedCategoryDetails.name && (selectedCategoryDetails.group ? t.group === selectedCategoryDetails.group : true))} 
+          onDelete={handleDeleteTransaction} 
+          onEdit={(tx: Transaction) => { setIsDetailsModalOpen(false); setEditingTransaction(tx); setIsModalOpen(true); }} 
+        />
+      )}
+
+      <CategoryManagerModal 
+        isOpen={isCategoryModalOpen} 
+        onClose={() => setIsCategoryModalOpen(false)} 
+        incomeCategories={incomeCategories} 
+        expenseGroups={expenseGroups} 
+        onSave={(inc: string[], exp: CategoryStructure[]) => { setIncomeCategories(inc); setExpenseGroups(exp); saveUserSettings(inc, exp, projectionSettings); setIsCategoryModalOpen(false); }} 
+      />
+      
       <BankImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleImportItems} expenseGroups={expenseGroups} incomeCategories={incomeCategories} existingTransactions={transactions} />
-      <ProjectionConfigModal isOpen={isProjectionModalOpen} onClose={() => setIsProjectionModalOpen(false)} expenseGroups={expenseGroups} currentSettings={projectionSettings} onSave={(s) => { setProjectionSettings(s); saveUserSettings(incomeCategories, expenseGroups, s); setIsProjectionModalOpen(false); }} />
+      
+      <ProjectionConfigModal 
+        isOpen={isProjectionModalOpen} 
+        onClose={() => setIsProjectionModalOpen(false)} 
+        expenseGroups={expenseGroups} 
+        currentSettings={projectionSettings} 
+        onSave={(s: ProjectionSettings) => { setProjectionSettings(s); saveUserSettings(incomeCategories, expenseGroups, s); setIsProjectionModalOpen(false); }} 
+      />
     </div>
   );
 }

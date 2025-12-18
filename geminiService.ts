@@ -1,6 +1,9 @@
 
 import { GoogleGenAI } from "@google/genai";
 
+// Declaração global para evitar erro de build no TypeScript sobre o process.env
+declare var process: { env: { API_KEY: string } };
+
 export interface ReceiptData {
   date?: string;
   amount?: number;
@@ -11,7 +14,6 @@ export interface ReceiptData {
 export const analyzeReceiptWithGemini = async (
   imageBase64: string
 ): Promise<ReceiptData> => {
-  // A inicialização deve usar estritamente process.env.API_KEY como parâmetro nomeado
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
@@ -44,12 +46,8 @@ export const analyzeReceiptWithGemini = async (
       },
     });
 
-    // O texto deve ser acessado via propriedade .text, nunca como método .text()
     const text = response.text;
-    
-    if (!text) {
-      throw new Error("A IA não retornou resposta.");
-    }
+    if (!text) throw new Error("A IA não retornou resposta.");
     
     const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
     return JSON.parse(jsonString) as ReceiptData;
