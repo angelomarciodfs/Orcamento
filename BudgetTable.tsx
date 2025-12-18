@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Transaction, TransactionType, CategoryStructure } from './types';
-import { Settings, FileSpreadsheet, Search } from 'lucide-react';
+import { Settings, FileSpreadsheet, Search, CreditCard } from 'lucide-react';
 
 interface BudgetTableProps {
   transactions: Transaction[];
@@ -110,7 +110,10 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
              <Settings size={14} /> Gerenciar
            </button>
            <button onClick={onOpenImport} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm">
-             <FileSpreadsheet size={14} /> Importar Extrato
+             <FileSpreadsheet size={14} /> Extrato Bancário
+           </button>
+           <button onClick={onOpenImport} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition-all shadow-sm">
+             <CreditCard size={14} /> Fatura Cartão
            </button>
          </div>
       </div>
