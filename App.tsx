@@ -223,17 +223,47 @@ function App() {
         <button onClick={handleLogout} className="text-gray-400 hover:text-white"><LogOut size={20} /></button>
       </header>
       
-      <div className="bg-white border-b p-4 flex flex-col md:flex-row justify-between items-center gap-4 sticky top-14 z-20">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}><ChevronLeft /></button>
-          <span className="font-bold uppercase">{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</span>
-          <button onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}><ChevronRight /></button>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => setActiveTab('table')} className={`px-4 py-2 rounded ${activeTab === 'table' ? 'bg-indigo-600 text-white' : 'bg-gray-100'}`}>Planilha</button>
-          <button onClick={() => setActiveTab('dashboard')} className={`px-4 py-2 rounded ${activeTab === 'dashboard' ? 'bg-indigo-600 text-white' : 'bg-gray-100'}`}>Gráficos</button>
-          <button onClick={() => openModal('INCOME')} className="bg-green-600 text-white px-4 py-2 rounded">+</button>
-          <button onClick={() => openModal('EXPENSE')} className="bg-red-600 text-white px-4 py-2 rounded">-</button>
+      {/* Barra de Navegação e Alternância de Abas - Centralizada para desktop */}
+      <div className="bg-white border-b sticky top-14 z-20">
+        <div className="max-w-4xl mx-auto p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-4 bg-gray-50 px-3 py-1.5 rounded-full border">
+            <button 
+              onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() - 1)))}
+              className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="font-bold uppercase text-sm w-32 text-center select-none">
+              {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+            </span>
+            <button 
+              onClick={() => setCurrentDate(new Date(currentDate.setMonth(currentDate.getMonth() + 1)))}
+              className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <div className="bg-gray-100 p-1 rounded-lg flex shadow-inner">
+              <button 
+                onClick={() => setActiveTab('table')} 
+                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'table' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Planilha
+              </button>
+              <button 
+                onClick={() => setActiveTab('dashboard')} 
+                className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${activeTab === 'dashboard' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Gráficos
+              </button>
+            </div>
+            <div className="flex gap-1">
+              <button onClick={() => openModal('INCOME')} className="bg-green-600 hover:bg-green-700 text-white w-9 h-9 flex items-center justify-center rounded-lg shadow-md transition-transform active:scale-95">+</button>
+              <button onClick={() => openModal('EXPENSE')} className="bg-red-600 hover:bg-red-700 text-white w-9 h-9 flex items-center justify-center rounded-lg shadow-md transition-transform active:scale-95">-</button>
+            </div>
+          </div>
         </div>
       </div>
 
