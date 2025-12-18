@@ -1,4 +1,5 @@
 
+// @ts-ignore
 import { GoogleGenAI } from "@google/genai";
 
 declare var process: { env: { API_KEY: string } };

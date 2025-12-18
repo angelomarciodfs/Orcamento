@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { X, Save, CheckSquare, Square, Info } from 'lucide-react';
+import { X, CheckSquare, Square, Info } from 'lucide-react';
 import type { CategoryStructure, ProjectionSettings } from './types';
 
 interface ProjectionConfigModalProps {
