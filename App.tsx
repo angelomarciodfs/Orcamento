@@ -141,16 +141,27 @@ function App() {
       } else {
          await addTransaction(txData);
       }
-      await loadUserData();
+      
+      // Sincronização imediata após qualquer alteração
+      const updatedTxs = await fetchTransactions();
+      setTransactions(updatedTxs);
+      
+      // Fecha modais e limpa edição
+      setIsModalOpen(false);
+      setEditingTransaction(null);
     } catch (error) {
-       console.error("Erro ao salvar:", error);
+       console.error("Erro ao salvar lançamento:", error);
+       alert("Erro ao salvar. Verifique sua conexão.");
     }
   };
 
   const handleDeleteTransaction = async (id: string) => {
     try {
       const success = await deleteTransaction(id);
-      if (success) await loadUserData();
+      if (success) {
+        const updatedTxs = await fetchTransactions();
+        setTransactions(updatedTxs);
+      }
     } catch (error) {
       console.error("Erro ao deletar:", error);
     }
@@ -168,7 +179,8 @@ function App() {
           observation: `Importado: ${item.description}`
         });
       }
-      await loadUserData();
+      const updatedTxs = await fetchTransactions();
+      setTransactions(updatedTxs);
     } catch (error) {
       console.error("Erro ao importar lançamentos:", error);
     }
@@ -223,7 +235,6 @@ function App() {
         <button onClick={handleLogout} className="text-gray-400 hover:text-white"><LogOut size={20} /></button>
       </header>
       
-      {/* Barra de Navegação e Alternância de Abas - Centralizada para desktop */}
       <div className="bg-white border-b sticky top-14 z-20">
         <div className="max-w-4xl mx-auto p-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4 bg-gray-50 px-3 py-1.5 rounded-full border">

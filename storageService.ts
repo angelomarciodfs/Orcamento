@@ -16,29 +16,37 @@ export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Prom
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data, error } = await supabase.from('transactions').insert([{ ...transaction, user_id: user.id }]).select().single();
-  if (error) return null;
+  if (error) {
+    console.error("Erro ao adicionar transação:", error);
+    return null;
+  }
   return data;
 };
 
+/**
+ * Estratégia de Delete-and-Insert para garantir persistência 
+ * contornando possíveis restrições de RLS ou PK em updates.
+ */
 export const updateTransaction = async (id: string, updates: Partial<Transaction>): Promise<Transaction | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   
-  // Remove o ID do objeto de atualização para evitar erro de 'Primary Key update'
-  const { id: _, created_at: __, user_id: ___, ...dataToUpdate } = updates as any;
-  
-  const { data, error } = await supabase.from('transactions')
-    .update(dataToUpdate)
+  // 1. Excluir o registro antigo
+  const { error: deleteError } = await supabase.from('transactions')
+    .delete()
     .eq('id', id)
-    .eq('user_id', user.id)
-    .select();
+    .eq('user_id', user.id);
 
-  if (data && data.length > 0) return data[0];
-  if (error) {
-    console.error("Erro ao atualizar transação:", error);
-    throw error;
+  if (deleteError) {
+    console.error("Erro ao remover registro antigo para atualização:", deleteError);
+    return null;
   }
-  return null;
+
+  // 2. Preparar dados para nova inserção (Removendo IDs e campos automáticos)
+  const { id: _, created_at: __, user_id: ___, ...cleanData } = updates as any;
+  
+  // 3. Inserir como novo registro
+  return await addTransaction(cleanData);
 };
 
 export const deleteTransaction = async (id: string): Promise<boolean> => {
