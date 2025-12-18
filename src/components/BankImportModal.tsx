@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, Check, AlertCircle, AlertTriangle, Wand2 } from 'lucide-react';
+import { X, Upload, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { ImportItem, CategoryStructure, TransactionType, Transaction } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -129,7 +129,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         const parsed: ImportItem[] = [];
         let idCounter = 0;
 
-        // Detect multiple potential header rows (for multi-card files)
         const headerIndices: number[] = [];
         jsonData.forEach((row, idx) => {
             const rowStr = row.map(c => String(c).toLowerCase().trim()).join('|');
@@ -139,7 +138,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         });
 
         if (headerIndices.length === 0) {
-            headerIndices.push(0); // Fallback
+            headerIndices.push(0);
         }
 
         headerIndices.forEach((headerIdx) => {
@@ -153,7 +152,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
             };
 
             for (let i = headerIdx + 1; i < jsonData.length; i++) {
-                // If we reach another header, stop this section
                 if (headerIndices.includes(i)) break;
                 const row = jsonData[i];
                 if (!row || row.length === 0) continue;
@@ -167,7 +165,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                 let amount = 0;
                 let type: TransactionType = 'EXPENSE';
 
-                // Price logic: prioritize R$, then US$, then generic
                 const valR = row[colMap.valR];
                 const valU = row[colMap.valU];
                 const valG = row[colMap.valG];
@@ -210,9 +207,8 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
     }
   };
 
-  const parseCSV = (text: string) => {
-    // Logic similar to parseExcel but for CSV...
-    // Redacted for brevity as Excel is the focus
+  const parseCSV = (_text: string) => {
+    // CSV logic...
   };
 
   const handleCategoryChange = (id: string, group: string, category: string) => {

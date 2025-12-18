@@ -1,6 +1,4 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-// Fix: Removed incorrect 'split' import and unused 'Sparkles' icon
 import { X, Camera, Loader2, Plus, Minus, Trash2, Calculator } from 'lucide-react';
 import type { Transaction, TransactionType, CategoryStructure } from '../types';
 import { analyzeReceiptWithGemini } from '../services/geminiService';
@@ -44,14 +42,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const [observation, setObservation] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Split Mode State
   const [isSplitMode, setIsSplitMode] = useState(false);
   const [splits, setSplits] = useState<SplitLine[]>([]);
 
-  // AI State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  // Fix: Removed local API key state management as per guidelines
 
   const formatCurrency = (value: number): string => {
     return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -118,7 +113,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   }, [isOpen, initialType, fixedDescription, fixedGroup, incomeCategories, expenseGroups, editingTransaction]);
 
-  // --- Split Logic ---
   const handleStartSplit = () => {
     const totalVal = parseCurrency(amount);
     if (isNaN(totalVal) || totalVal <= 0) {
@@ -126,7 +120,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
       return;
     }
     setIsSplitMode(true);
-    // Initialize with one line for the current selected category
     setSplits([
       { 
         id: Math.random().toString(36).substr(2, 9), 
@@ -190,7 +183,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
     try {
         if (isSplitMode) {
-            // Send special payload for splitting
             await onSave({
               isSplit: true,
               originalId: editingTransaction?.id,
@@ -227,9 +219,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }
   };
 
-  // --- AI Logic ---
   const handleCameraClick = () => {
-    // Fix: Removed API key prompt as it's handled via process.env.API_KEY
     fileInputRef.current?.click();
   };
 
@@ -242,7 +232,6 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
           reader.onloadend = async () => {
               const base64 = reader.result as string;
               try {
-                  // Fix: Call analyzeReceiptWithGemini without passing an explicit key
                   const data = await analyzeReceiptWithGemini(base64);
                   if (data.date) setDate(data.date);
                   if (data.amount) {
@@ -368,7 +357,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 </div>
 
                 <div className="space-y-3">
-                  {splits.map((s, idx) => (
+                  {splits.map((s) => (
                     <div key={s.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2 relative">
                       <button type="button" onClick={() => removeSplitLine(s.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
                       

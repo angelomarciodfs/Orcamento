@@ -86,22 +86,25 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-4">
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-3 rounded-lg shadow-sm border border-gray-200">
-         <h3 className="text-gray-500 font-bold text-xs uppercase tracking-widest">Ações da Planilha</h3>
-         <div className="flex flex-wrap gap-2">
-           <button onClick={onManageCategories} className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded border border-gray-300 text-xs font-bold hover:bg-gray-200 transition-colors">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-4 rounded-xl shadow-md border border-gray-200">
+         <div className="flex flex-col">
+            <h3 className="text-gray-700 font-bold text-sm">Ferramentas de Gestão</h3>
+            <p className="text-[10px] text-gray-400 uppercase tracking-tighter">Categorias e Importação de Arquivos</p>
+         </div>
+         <div className="flex flex-wrap gap-2 justify-center sm:justify-end w-full sm:w-auto">
+           <button onClick={onManageCategories} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-gray-900 transition-all shadow-sm">
              <Settings size={14} /> Categorias
            </button>
-           <button onClick={onOpenImport} className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 rounded border border-indigo-200 text-xs font-bold hover:bg-indigo-100 transition-colors">
+           <button onClick={onOpenImport} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm">
              <FileSpreadsheet size={14} /> Extrato Bancário
            </button>
-           <button onClick={onOpenImport} className="flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 rounded border border-orange-200 text-xs font-bold hover:bg-orange-100 transition-colors">
+           <button onClick={onOpenImport} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition-all shadow-sm border border-orange-500">
              <CreditCard size={14} /> Fatura Cartão
            </button>
          </div>
       </div>
 
-      <div className="bg-white shadow-2xl overflow-hidden border border-gray-400">
+      <div className="bg-white shadow-2xl overflow-hidden border border-gray-400 rounded-sm">
         <div className="grid grid-cols-[1fr_140px_80px] bg-gray-800 text-white font-bold text-sm border-b border-gray-800">
           <div className="px-2 py-2 uppercase text-center border-r border-gray-600">Categoria</div>
           <div className="px-2 py-2 uppercase text-center border-r border-gray-600">Valor (R$)</div>
