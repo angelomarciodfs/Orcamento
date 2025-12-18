@@ -4,22 +4,16 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
-  define: {
-    // Define process.env para evitar erros em tempo de execução/build
-    'process.env': {}
-  },
   build: {
     rollupOptions: {
-      // Lista de módulos que devem ser tratados como externos (carregados via CDN/importmap)
       external: [
         'react',
         'react-dom',
+        'react-dom/client',
         'lucide-react',
         'recharts',
         'xlsx',
-        '@google/genai',
-        '@google/generative-ai',
-        'react/jsx-runtime'
+        '@google/genai'
       ],
       output: {
         globals: {

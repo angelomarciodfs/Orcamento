@@ -12,8 +12,19 @@ export interface ReceiptData {
 export const analyzeReceiptWithGemini = async (
   imageBase64: string
 ): Promise<ReceiptData> => {
-  // @ts-ignore
-  const apiKey = process.env.API_KEY || "";
+  // Verificação segura para evitar erro de 'process is not defined'
+  let apiKey = "";
+  try {
+    // @ts-ignore
+    apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+  } catch (e) {
+    console.warn("Ambiente sem process.env definido");
+  }
+
+  if (!apiKey) {
+    throw new Error("API Key do Gemini não configurada.");
+  }
+
   // @ts-ignore
   const ai = new GoogleGenAI({ apiKey });
   
@@ -32,32 +43,25 @@ export const analyzeReceiptWithGemini = async (
           },
           {
             text: `
-              Analise esta imagem de um comprovante fiscal ou recibo brasileiro.
-              Extraia as seguintes informações em formato JSON estrito, sem markdown:
-              1. "date": A data da compra no formato YYYY-MM-DD.
-              2. "amount": O valor total da compra (número float).
-              3. "description": O nome do estabelecimento ou uma descrição resumida (ex: "Mercado Extra", "Uber").
-              4. "categoryHint": Uma sugestão de categoria baseada no estabelecimento (ex: "Alimentação", "Transporte", "Saúde", "Farmácia").
-              
-              Se não encontrar algum dado, retorne null no campo.
-              Responda APENAS o JSON.
+              Analise esta imagem de um comprovante fiscal brasileiro.
+              Retorne APENAS um JSON:
+              {
+                "date": "YYYY-MM-DD",
+                "amount": 0.00,
+                "description": "Nome do Local",
+                "categoryHint": "Categoria Sugerida"
+              }
             `
           }
         ]
       },
     });
 
-    const text = response.text;
-    
-    if (!text) {
-      throw new Error("A IA não retornou nenhum texto.");
-    }
-    
+    const text = response.text || "";
     const jsonString = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    
     return JSON.parse(jsonString) as ReceiptData;
   } catch (error) {
-    console.error("Erro ao analisar recibo:", error);
-    throw new Error("Não foi possível ler o comprovante. Verifique a qualidade da foto.");
+    console.error("Erro Gemini:", error);
+    throw new Error("Falha na análise da IA.");
   }
 };
