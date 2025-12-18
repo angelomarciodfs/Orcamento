@@ -61,9 +61,18 @@ export const fetchUserSettings = async (): Promise<{
       banks: ['Banco CEF', 'Santander', 'Banco do Brasil'],
       investments: ['Tesouro Direto']
   };
+  
   if (!user) return defaults;
-  const { data, error } = await supabase.from('user_settings').select('*').eq('user_id', user.id).single();
-  if (error || !data) return defaults;
+
+  const { data, error } = await supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle();
+  
+  if (error) {
+    console.error("Erro ao carregar configurações:", error);
+    return defaults;
+  }
+
+  if (!data) return defaults;
+
   return {
     income: data.income_categories || defaults.income,
     expenses: data.expense_groups || defaults.expenses,
@@ -76,22 +85,36 @@ export const fetchUserSettings = async (): Promise<{
 export const saveUserSettings = async (
   income: string[], 
   expenses: CategoryStructure[], 
-  projection?: ProjectionSettings,
-  banks?: string[],
-  investments?: string[]
+  projection: ProjectionSettings,
+  banks: string[],
+  investments: string[]
 ) => {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  const payload: any = { 
+  if (!user) {
+    throw new Error("Usuário não autenticado");
+  }
+
+  // Montamos o payload exatamente com os nomes das colunas da tabela
+  const payload = { 
     user_id: user.id, 
     income_categories: income, 
-    expense_groups: expenses 
+    expense_groups: expenses,
+    projection_settings: projection,
+    bank_list: banks,
+    investment_list: investments
   };
-  if (projection) payload.projection_settings = projection;
-  if (banks) payload.bank_list = banks;
-  if (investments) payload.investment_list = investments;
   
-  await supabase.from('user_settings').upsert(payload);
+  console.log("Tentando salvar configurações no Supabase:", payload);
+
+  // O onConflict 'user_id' só funciona se houver uma UNIQUE CONSTRAINT no banco de dados.
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert(payload, { onConflict: 'user_id' });
+
+  if (error) {
+    console.error("Erro detalhado ao salvar configurações:", error);
+    throw error;
+  }
 };
 
 export const signOut = async () => { await supabase.auth.signOut(); };
