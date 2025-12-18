@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, AlertCircle, AlertTriangle, FileText, Check } from 'lucide-react';
 import type { ImportItem, CategoryStructure, TransactionType, Transaction } from './types';
 import * as XLSX from 'xlsx';
@@ -20,6 +20,15 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
   const [importItems, setImportItems] = useState<ImportItem[]>([]);
   const [step, setStep] = useState<'UPLOAD' | 'CLASSIFY'>('UPLOAD');
   const [error, setError] = useState<string | null>(null);
+
+  // Resetar o modal sempre que ele for fechado ou aberto
+  useEffect(() => {
+    if (!isOpen) {
+      setImportItems([]);
+      setStep('UPLOAD');
+      setError(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -56,7 +65,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
       });
 
       // 2. Busca no Histórico para Sugestão Inteligente (Aprendizado)
-      // Se não for duplicado, procuramos transações antigas que tenham o mesmo "texto de banco" na observação
       const historyMatch = duplicateMatch || [...existingTransactions].reverse().find(ex => {
         if (!ex.group) return false;
         
@@ -65,7 +73,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           historicalBankText = ex.observation.split(/importado:/i)[1]?.toLowerCase().trim() || '';
         }
 
-        // Tenta casar o texto limpo atual com o texto de banco gravado anteriormente ou com a descrição
         const matchTarget = historicalBankText || ex.description.toLowerCase().trim();
         
         return itemCleaned === matchTarget || 
@@ -76,7 +83,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
       return {
         ...item,
         isPossibleDuplicate: !!duplicateMatch,
-        isChecked: false, // Mantém desmarcado para conferência manual
+        isChecked: false, 
         selectedGroup: historyMatch?.group || (item.type === 'INCOME' ? 'Receitas' : (expenseGroups[0]?.name || '')),
         selectedCategory: historyMatch?.description || ''
       };
@@ -220,7 +227,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
       return;
     }
     onImport(selected);
-    onClose();
+    onClose(); // O useEffect cuidará de limpar o estado
   };
 
   return (
