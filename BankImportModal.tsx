@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { X, Upload, AlertCircle, AlertTriangle, FileText, Check, Wand2 } from 'lucide-react';
+import { X, Upload, AlertCircle, AlertTriangle, FileText, Check } from 'lucide-react';
 import type { ImportItem, CategoryStructure, TransactionType, Transaction } from './types';
 import * as XLSX from 'xlsx';
 
@@ -39,7 +39,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
       const itemDescLower = item.description.toLowerCase().trim();
       const itemCleaned = getCleanDescription(item.description);
 
-      // 1. Verificar Duplicados com lógica flexível
+      // 1. Verificar Duplicados com lógica flexível (Suporta sufixos de códigos de barras/transação)
       const isDuplicate = existingTransactions.some(ex => {
         const sameDate = ex.date === item.date;
         const sameAmount = Math.abs(Math.abs(ex.amount) - item.amount) < 0.01;
@@ -47,20 +47,20 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         if (!sameDate || !sameAmount) return false;
 
         const obsLower = (ex.observation || '').toLowerCase();
-        const descLower = ex.description.toLowerCase();
+        const descLower = ex.description.toLowerCase().trim();
 
-        // Se já foi importado antes, extraímos o que vem depois de "Importado: "
+        // Se já foi importado antes, comparamos o conteúdo bruto salvo no histórico
         if (obsLower.includes('importado:')) {
           const importedContent = obsLower.split('importado:')[1]?.trim() || '';
-          // Verifica se a descrição atual contém a antiga ou vice-versa (fuzzy match)
+          // Fuzzy match: verifica se uma descrição está contida na outra
           if (itemDescLower.includes(importedContent) || importedContent.includes(itemDescLower)) return true;
         }
 
-        // Verifica também contra a descrição manual
+        // Verifica também contra a descrição manual do lançamento
         return itemDescLower.includes(descLower) || descLower.includes(itemDescLower);
       });
 
-      // 2. Busca no Histórico para Sugestão de Classificação
+      // 2. Busca no Histórico para Sugestão de Classificação (Aprendizado)
       const historyMatch = existingTransactions.find(ex => {
         if (!ex.group) return false;
         const historyDesc = ex.description.toLowerCase().trim();
@@ -162,6 +162,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           const date = parseAnyDate(row[colMap.date]);
           if (!date) continue;
 
+          // Fusão de todas as colunas de descrição encontradas (Padrão BB e Santander)
           const rawDescription = colMap.descs
             .map(idx => String(row[idx] || '').trim())
             .filter(s => !!s)
@@ -172,6 +173,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           let val = 0;
           let type: TransactionType = 'EXPENSE';
 
+          // Suporte a Santander/BB com colunas separadas ou valor único
           if (colMap.credit !== -1 || colMap.debit !== -1) {
             const c = parseNum(row[colMap.credit]);
             const d = parseNum(row[colMap.debit]);
@@ -212,7 +214,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
   const handleConfirm = () => {
     const selected = importItems.filter(i => i.isChecked && i.selectedCategory);
     if (selected.length === 0) {
-      alert("Selecione os lançamentos e defina suas categorias.");
+      alert("Selecione os lançamentos marcando a caixa e definindo a categoria.");
       return;
     }
     onImport(selected);
