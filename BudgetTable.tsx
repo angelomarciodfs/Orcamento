@@ -41,15 +41,25 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
       .reduce((acc, curr) => acc + curr.amount, 0);
   };
 
+  // Cálculos de Despesas e Resultado
   const expenseTransactions = transactions.filter(t => t.type === 'EXPENSE');
   const totalExpenses = expenseTransactions.reduce((acc, t) => acc + t.amount, 0);
   const extraIncome = transactions.filter(t => t.type === 'EXTRA' && t.description === 'Receita Extra').reduce((acc, t) => acc + t.amount, 0);
   const resultFinal = totalIncome - totalExpenses; 
 
+  // Cálculos Bancários
   const santanderBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Santander').reduce((acc, t) => acc + t.amount, 0);
   const bbBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Banco do Brasil').reduce((acc, t) => acc + t.amount, 0);
+  const cefBalance = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Banco CEF').reduce((acc, t) => acc + t.amount, 0);
   
-  const totalBancario = santanderBalance + bbBalance + resultFinal + extraIncome;
+  const totalBancario = santanderBalance + bbBalance + cefBalance + resultFinal + extraIncome;
+
+  // Cálculos de Investimentos
+  const tesouroDireto = transactions.filter(t => t.type === 'BALANCE' && t.description === 'Tesouro Direto').reduce((acc, t) => acc + t.amount, 0);
+  const totalInvestimentos = tesouroDireto; // Pode ser expandido para somar mais categorias
+
+  // Total Financeiro (Saldos + Investimentos)
+  const totalFinanceiro = totalBancario + totalInvestimentos;
 
   const cellBase = "px-2 py-1 border-r border-gray-300 text-sm flex items-center";
   const cellValue = "px-2 py-1 border-r border-gray-300 text-sm text-right font-mono flex items-center justify-end";
@@ -80,13 +90,14 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
         )}
       </div>
       <div className={cellPercent}>
-        {value !== undefined && !isGroupHeader && !['Receita Extra', 'Santander', 'Banco do Brasil'].includes(label) ? calcPercent(value) : ''}
+        {value !== undefined && !isGroupHeader && !['Receita Extra', 'Santander', 'Banco do Brasil', 'Banco CEF', 'Tesouro Direto', 'Saldo Total'].includes(label) ? calcPercent(value) : ''}
       </div>
     </div>
   );
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-4">
+    <div className="w-full max-w-4xl mx-auto space-y-4 pb-12">
+      {/* Ferramentas de Gestão */}
       <div className="flex flex-col sm:flex-row justify-between items-center gap-3 bg-white p-4 rounded-xl shadow-md border border-gray-200">
          <div className="flex flex-col">
             <h3 className="text-gray-700 font-bold text-sm">Ferramentas de Gestão</h3>
@@ -109,12 +120,14 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
       </div>
 
       <div className="bg-white shadow-2xl overflow-hidden border border-gray-400 rounded-sm">
+        {/* Header Principal */}
         <div className="grid grid-cols-[1fr_140px_80px] bg-gray-800 text-white font-bold text-sm border-b border-gray-800">
           <div className="px-2 py-2 uppercase text-center border-r border-gray-600">Categoria</div>
           <div className="px-2 py-2 uppercase text-center border-r border-gray-600">Valor (R$)</div>
           <div className="px-2 py-2 uppercase text-center">%</div>
         </div>
 
+        {/* Seção Receitas */}
         <div className="grid grid-cols-[1fr_140px_80px] bg-[#d7e4bc] border-b border-gray-400 text-[#006100] font-bold">
           <div className="px-2 py-1 uppercase">RECEITAS</div>
           <div className="px-2 py-1"></div>
@@ -128,6 +141,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
         </div>
 
         <div className="h-4 bg-gray-100 border-b border-gray-300"></div>
+
+        {/* Seção Despesas */}
         <div className="grid grid-cols-[1fr_140px_80px] bg-[#f2dcdb] border-b border-gray-400 text-[#963634] font-bold">
           <div className="px-2 py-1 uppercase">SAÍDAS (DESPESAS)</div>
           <div className="px-2 py-1"></div>
@@ -146,6 +161,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
         </div>
 
         <div className="h-4 bg-gray-100 border-b border-gray-300"></div>
+
+        {/* Resultado do Mês */}
         <div className="grid grid-cols-[1fr_140px_80px] bg-black text-white font-bold border-t-2 border-gray-800">
           <div className="px-2 py-2 uppercase flex items-center">RESULTADO (Mês)</div>
           <div className={`px-2 py-2 text-right font-mono text-lg ${resultFinal >= 0 ? 'text-[#a9d08e]' : 'text-[#ff7c80]'}`}>{formatCurrency(resultFinal)}</div>
@@ -153,6 +170,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
         </div>
 
         <div className="h-4 bg-gray-100 border-b border-gray-300"></div>
+
+        {/* Receita Extra */}
         <div className="grid grid-cols-[1fr_140px_80px] bg-[#b7dee8] border-b border-gray-400 font-bold">
           <div className="px-2 py-1 uppercase text-gray-800">RECEITA EXTRA</div>
           <div className="px-2 py-1"></div>
@@ -160,18 +179,52 @@ const BudgetTable: React.FC<BudgetTableProps> = ({
         </div>
         <Row label="Receita Extra" value={extraIncome} isEditable groupName="Extra" onAddClick={() => onOpenModalFor('EXTRA', 'Receita Extra', 'Extra')} />
 
-        <div className="grid grid-cols-[1fr_140px_80px] bg-black text-white font-bold border-t-2 border-gray-800 mt-2">
+        <div className="h-4 bg-gray-100 border-b border-gray-300"></div>
+
+        {/* Extratos Bancários */}
+        <div className="grid grid-cols-[1fr_140px_80px] bg-black text-white font-bold border-t-2 border-gray-800">
            <div className="px-2 py-1 uppercase">EXTRATOS BANCÁRIOS</div>
            <div className="px-2 py-1"></div>
            <div className="px-2 py-1"></div>
         </div>
-        <Row label="Santander" value={santanderBalance} bgColor="bg-[#d7e4bc]" isEditable groupName="Bancos" onAddClick={() => onOpenModalFor('BALANCE', 'Santander', 'Bancos')} />
-        <Row label="Banco do Brasil" value={bbBalance} bgColor="bg-[#d7e4bc]" isEditable groupName="Bancos" onAddClick={() => onOpenModalFor('BALANCE', 'Banco do Brasil', 'Bancos')} />
+        <Row label="Banco CEF" value={cefBalance} bgColor="bg-[#b7dee8]" isEditable groupName="Bancos" onAddClick={() => onOpenModalFor('BALANCE', 'Banco CEF', 'Bancos')} />
+        <Row label="Santander" value={santanderBalance} bgColor="bg-[#b7dee8]" isEditable groupName="Bancos" onAddClick={() => onOpenModalFor('BALANCE', 'Santander', 'Bancos')} />
+        <Row label="Banco do Brasil" value={bbBalance} bgColor="bg-[#b7dee8]" isEditable groupName="Bancos" onAddClick={() => onOpenModalFor('BALANCE', 'Banco do Brasil', 'Bancos')} />
         
-        <div className="grid grid-cols-[1fr_140px_80px] bg-[#92d050] text-black font-bold border-y border-gray-600">
+        <div className="grid grid-cols-[1fr_140px_80px] bg-[#d7e4bc] text-[#006100] font-bold border-y border-gray-600">
            <div className="px-2 py-1 uppercase">TOTAL BANCÁRIO</div>
            <div className="px-2 py-1 text-right font-mono">{formatCurrency(totalBancario)}</div>
            <div className="px-2 py-1"></div>
+        </div>
+
+        <div className="h-4 bg-gray-100 border-b border-gray-300"></div>
+
+        {/* Seção Investimentos */}
+        <div className="grid grid-cols-[1fr_140px_80px] bg-black text-white font-bold border-t-2 border-gray-800">
+           <div className="px-2 py-1 uppercase">INVESTIMENTOS 2025</div>
+           <div className="px-2 py-1"></div>
+           <div className="px-2 py-1"></div>
+        </div>
+        <Row label="Tesouro Direto" value={tesouroDireto} bgColor="bg-[#b7dee8]" isEditable groupName="Investimentos" onAddClick={() => onOpenModalFor('BALANCE', 'Tesouro Direto', 'Investimentos')} />
+        
+        <div className="grid grid-cols-[1fr_140px_80px] bg-[#d7e4bc] text-[#006100] font-bold border-y border-gray-600">
+           <div className="px-2 py-1 uppercase">TOTAL INVESTIMENTOS</div>
+           <div className="px-2 py-1 text-right font-mono">{formatCurrency(totalInvestimentos)}</div>
+           <div className="px-2 py-1"></div>
+        </div>
+
+        <div className="h-4 bg-gray-100 border-b border-gray-300"></div>
+
+        {/* Total Financeiro / Saldo Total */}
+        <div className="grid grid-cols-[1fr_140px_80px] bg-black text-white font-bold border-t-2 border-gray-800">
+           <div className="px-2 py-1 uppercase">TOTAL FINANCEIRO</div>
+           <div className="px-2 py-1"></div>
+           <div className="px-2 py-1"></div>
+        </div>
+        <div className="grid grid-cols-[1fr_140px_80px] bg-white border-b border-gray-300 font-bold text-gray-800">
+          <div className="px-2 py-2 flex items-center border-r border-gray-300">SALDO TOTAL</div>
+          <div className="px-2 py-2 text-right font-mono text-xl border-r border-gray-300 flex items-center justify-end">{formatCurrency(totalFinanceiro)}</div>
+          <div className="bg-gray-50"></div>
         </div>
       </div>
     </div>
