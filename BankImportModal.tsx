@@ -39,27 +39,40 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
       const itemDescLower = item.description.toLowerCase().trim();
       const itemCleaned = getCleanDescription(item.description);
 
-      // 1. Verificar Duplicados Exatos
+      // 1. Verificar Duplicados com lógica flexível
       const isDuplicate = existingTransactions.some(ex => {
         const sameDate = ex.date === item.date;
         const sameAmount = Math.abs(Math.abs(ex.amount) - item.amount) < 0.01;
-        const isImported = ex.observation?.toLowerCase().includes(itemDescLower);
-        return sameDate && sameAmount && isImported;
+        
+        if (!sameDate || !sameAmount) return false;
+
+        const obsLower = (ex.observation || '').toLowerCase();
+        const descLower = ex.description.toLowerCase();
+
+        // Se já foi importado antes, extraímos o que vem depois de "Importado: "
+        if (obsLower.includes('importado:')) {
+          const importedContent = obsLower.split('importado:')[1]?.trim() || '';
+          // Verifica se a descrição atual contém a antiga ou vice-versa (fuzzy match)
+          if (itemDescLower.includes(importedContent) || importedContent.includes(itemDescLower)) return true;
+        }
+
+        // Verifica também contra a descrição manual
+        return itemDescLower.includes(descLower) || descLower.includes(itemDescLower);
       });
 
-      // 2. Busca no Histórico para Classificação Automática
+      // 2. Busca no Histórico para Sugestão de Classificação
       const historyMatch = existingTransactions.find(ex => {
         if (!ex.group) return false;
         const historyDesc = ex.description.toLowerCase().trim();
         return itemCleaned === historyDesc || 
-               itemCleaned.includes(historyDesc) && historyDesc.length > 3 ||
-               historyDesc.includes(itemCleaned) && itemCleaned.length > 3;
+               (itemCleaned.includes(historyDesc) && historyDesc.length > 3) ||
+               (historyDesc.includes(itemCleaned) && itemCleaned.length > 3);
       });
 
       return {
         ...item,
         isPossibleDuplicate: isDuplicate,
-        isChecked: !isDuplicate && !!historyMatch,
+        isChecked: false, // SEMPRE desmarcado por padrão conforme solicitado
         selectedGroup: historyMatch?.group || (item.type === 'INCOME' ? 'Receitas' : (expenseGroups[0]?.name || '')),
         selectedCategory: historyMatch?.description || ''
       };
@@ -117,7 +130,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
         let headerIdx = -1;
         let colMap = { date: -1, descs: [] as number[], credit: -1, debit: -1, amount: -1 };
 
-        // Identificação de colunas flexível (incluindo "Lançamento" e "Detalhes" do BB)
         const dateSyns = ['data', 'dt.'];
         const descSyns = ['descrição', 'descricão', 'historico', 'histórico', 'lançamento', 'lancamento', 'detalhes', 'detalhe', 'informação', 'docto'];
         const creditSyns = ['crédito', 'credito', 'entrada'];
@@ -150,7 +162,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           const date = parseAnyDate(row[colMap.date]);
           if (!date) continue;
 
-          // Fusão de Colunas de Descrição (BB/Santander)
           const rawDescription = colMap.descs
             .map(idx => String(row[idx] || '').trim())
             .filter(s => !!s)
@@ -161,7 +172,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           let val = 0;
           let type: TransactionType = 'EXPENSE';
 
-          // Lógica Santander/BB com colunas Crédito/Débito
           if (colMap.credit !== -1 || colMap.debit !== -1) {
             const c = parseNum(row[colMap.credit]);
             const d = parseNum(row[colMap.debit]);
@@ -170,7 +180,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           } else if (colMap.amount !== -1) {
             const a = parseNum(row[colMap.amount]);
             val = Math.abs(a);
-            type = a < 0 ? 'EXPENSE' : 'INCOME'; // Em coluna única, negativo costuma ser despesa
+            type = a < 0 ? 'EXPENSE' : 'INCOME';
           }
 
           if (val > 0) {
@@ -213,7 +223,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
         
-        {/* Header */}
         <div className="flex justify-between items-center p-5 border-b bg-gray-50 shrink-0">
           <div className="flex items-center gap-3">
             <div className="bg-indigo-600 p-2 rounded-lg text-white"><Upload size={20} /></div>
@@ -225,7 +234,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"><X size={24} /></button>
         </div>
 
-        {/* Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col bg-gray-50/30">
           {error && (
             <div className="p-4 shrink-0">
@@ -245,11 +253,6 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                 <h3 className="text-lg font-bold text-gray-800">Selecione seu Extrato</h3>
                 <p className="text-sm text-gray-500 mt-2">Santander, Banco do Brasil, Itaú, etc. (XLSX, CSV)</p>
                 <input type="file" ref={fileInputRef} className="hidden" accept=".csv,.xls,.xlsx" onChange={handleFileUpload} />
-              </div>
-              <div className="mt-8 flex gap-6 opacity-40 grayscale">
-                <span className="text-[10px] font-bold uppercase flex items-center gap-1"><Check size={14}/> Fusão de Colunas</span>
-                <span className="text-[10px] font-bold uppercase flex items-center gap-1"><Check size={14}/> Memória de Histórico</span>
-                <span className="text-[10px] font-bold uppercase flex items-center gap-1"><Check size={14}/> Detecção de Duplicados</span>
               </div>
             </div>
           ) : (
@@ -272,7 +275,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {importItems.map(item => (
-                      <tr key={item.id} className={`${item.isPossibleDuplicate ? 'bg-amber-50/70' : 'hover:bg-gray-50'} transition-colors ${!item.isChecked ? 'opacity-60' : ''}`}>
+                      <tr key={item.id} className={`${item.isPossibleDuplicate ? 'bg-amber-100/90' : 'hover:bg-gray-50'} transition-colors ${!item.isChecked ? 'opacity-60' : ''}`}>
                         <td className="p-3 text-center">
                           <input 
                             type="checkbox" 
@@ -287,8 +290,8 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-gray-700">{item.description}</span>
                             {item.isPossibleDuplicate && (
-                              <span className="flex items-center gap-1 text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded" title="Possível duplicado">
-                                <AlertTriangle size={10} /> JÁ EXISTE
+                              <span className="flex items-center gap-1 text-[9px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded shadow-sm">
+                                <AlertTriangle size={10} /> JÁ IMPORTADO
                               </span>
                             )}
                           </div>
@@ -327,12 +330,11 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           )}
         </div>
 
-        {/* Footer Area */}
         <div className="p-5 border-t bg-white shrink-0 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-xs text-gray-500 flex items-center gap-4">
             {step === 'CLASSIFY' && (
               <>
-                <span className="flex items-center gap-1"><Wand2 size={12}/> Sugestões aplicadas</span>
+                <span className="flex items-center gap-1 font-semibold text-amber-700"><AlertTriangle size={12}/> Amarelo: Já existe no sistema</span>
                 <span><strong>{importItems.filter(i => i.isChecked).length}</strong> de {importItems.length} selecionados</span>
               </>
             )}
@@ -340,7 +342,7 @@ const BankImportModal: React.FC<BankImportModalProps> = ({
           <div className="flex gap-3 w-full sm:w-auto">
             {step === 'CLASSIFY' && (
               <button onClick={() => setStep('UPLOAD')} className="flex-1 sm:flex-none px-6 py-2 text-gray-600 font-bold hover:bg-gray-100 rounded-xl transition-colors">
-                Reiniciar
+                Trocar Arquivo
               </button>
             )}
             <button 
