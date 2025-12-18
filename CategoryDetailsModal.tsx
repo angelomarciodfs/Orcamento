@@ -1,12 +1,13 @@
+
 import React from 'react';
 import { X, Edit2, Trash2 } from 'lucide-react';
-import type { Transaction } from '../../types';
+import type { Transaction } from './types';
 
 interface CategoryDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   categoryName: string;
-  transactions: Transaction[]; // Already filtered by month/category
+  transactions: Transaction[];
   onDelete: (id: string) => void;
   onEdit: (transaction: Transaction) => void;
 }
@@ -47,35 +48,18 @@ const CategoryDetailsModal: React.FC<CategoryDetailsModalProps> = ({
                         {t.observation && <span className="ml-1 italic">- {t.observation}</span>}
                     </div>
                   </div>
-                  <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                    <button
-                        onClick={() => onEdit(t)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-full"
-                        title="Editar"
-                    >
-                        <Edit2 size={16} />
-                    </button>
-                    <button
-                        onClick={() => {
-                            if(confirm('Excluir este lançamento?')) onDelete(t.id);
-                        }}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-full"
-                        title="Excluir"
-                    >
-                        <Trash2 size={16} />
-                    </button>
+                  <div className="flex gap-2">
+                    <button onClick={() => onEdit(t)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-full"><Edit2 size={16} /></button>
+                    <button onClick={() => { if(confirm('Excluir?')) onDelete(t.id); }} className="p-2 text-red-600 hover:bg-red-50 rounded-full"><Trash2 size={16} /></button>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-
         <div className="p-4 border-t bg-gray-50 flex justify-between items-center">
-            <span className="font-semibold text-gray-600 uppercase text-xs">Total Acumulado</span>
-            <span className="font-bold text-xl text-gray-800">
-                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}
-            </span>
+            <span className="font-semibold text-gray-600 uppercase text-xs">Total</span>
+            <span className="font-bold text-xl text-gray-800">{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(total)}</span>
         </div>
       </div>
     </div>
