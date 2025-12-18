@@ -88,10 +88,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const projectionRows = [
-    { label: "DÍZIMO - 10%", actual: tithes, percent: calcPercent(tithes), target: 10, color: "bg-yellow-50 text-yellow-800" },
-    { label: "NECESSIDADES BÁSICAS - 50%", actual: needs, percent: calcPercent(needs), target: 50, color: "bg-blue-50 text-blue-800" },
-    { label: "LAZER / DESEJOS - 30%", actual: wants, percent: calcPercent(wants), target: 30, color: "bg-purple-50 text-purple-800" },
-    { label: "POUPANÇA / INVESTIMENTOS - 10%", actual: savings, percent: calcPercent(savings), target: 10, color: "bg-green-50 text-green-800" }
+    { label: "DÍZIMO - 10%", actual: tithes, percent: calcPercent(tithes), target: 10, color: "bg-yellow-50 text-yellow-800", isSavings: false },
+    { label: "NECESSIDADES BÁSICAS - 50%", actual: needs, percent: calcPercent(needs), target: 50, color: "bg-blue-50 text-blue-800", isSavings: false },
+    { label: "LAZER / DESEJOS - 30%", actual: wants, percent: calcPercent(wants), target: 30, color: "bg-purple-50 text-purple-800", isSavings: false },
+    { label: "POUPANÇA / INVESTIMENTOS - 10%", actual: savings, percent: calcPercent(savings), target: 10, color: "bg-green-50 text-green-800", isSavings: true }
   ];
 
   const totalPercent = projectionRows.reduce((acc, row) => acc + (row.percent || 0), 0);
@@ -160,20 +160,30 @@ const Dashboard: React.FC<DashboardProps> = ({
                  </tr>
                </thead>
                <tbody className="divide-y divide-gray-100">
-                  {projectionRows.map((row) => (
-                    <tr key={row.label} className={`${row.color} hover:brightness-95 transition-all`}>
-                      <td className="px-4 py-3 font-semibold">{row.label}</td>
-                      <td className="px-4 py-3 text-center font-mono opacity-60">{row.target}%</td>
-                      <td className="px-4 py-3 text-right font-mono font-bold">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.actual)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${Math.abs(row.percent - row.target) < 5 ? 'bg-green-500 text-white' : 'bg-white border text-gray-600'}`}>
-                          {row.percent.toFixed(1)}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {projectionRows.map((row) => {
+                    // Lógica de alerta: 
+                    // Se for poupança: alerta se for negativo.
+                    // Se for gasto: alerta se ultrapassar a meta.
+                    const isAlert = row.isSavings ? row.percent < 0 : row.percent > row.target;
+                    const badgeClass = isAlert 
+                      ? 'bg-red-600 text-white shadow-sm' 
+                      : 'bg-green-600 text-white shadow-sm';
+
+                    return (
+                      <tr key={row.label} className={`${row.color} hover:brightness-95 transition-all`}>
+                        <td className="px-4 py-3 font-semibold">{row.label}</td>
+                        <td className="px-4 py-3 text-center font-mono opacity-60">{row.target}%</td>
+                        <td className="px-4 py-3 text-right font-mono font-bold">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(row.actual)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold inline-block min-w-[50px] ${badgeClass}`}>
+                            {row.percent.toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                   <tr className="bg-gray-900 text-white font-bold">
                     <td className="px-4 py-3">TOTAL DISTRIBUÍDO</td>
                     <td className="px-4 py-3 text-center opacity-50">100%</td>
