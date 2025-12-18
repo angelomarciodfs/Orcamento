@@ -1,3 +1,4 @@
+
 import React from 'react';
 import type { Transaction, TransactionType, CategoryStructure } from '../types';
 import { Settings, FileSpreadsheet, CreditCard } from 'lucide-react';

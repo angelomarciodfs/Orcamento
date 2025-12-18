@@ -1,3 +1,4 @@
+
 // @ts-ignore
 import { GoogleGenAI } from "@google/genai";
 
@@ -12,7 +13,8 @@ export const analyzeReceiptWithGemini = async (
   imageBase64: string
 ): Promise<ReceiptData> => {
   // @ts-ignore
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.API_KEY || "";
+  // @ts-ignore
   const ai = new GoogleGenAI({ apiKey });
   
   try {
