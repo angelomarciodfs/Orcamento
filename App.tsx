@@ -34,6 +34,8 @@ function App() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [incomeCategories, setIncomeCategories] = useState<string[]>([]);
   const [expenseGroups, setExpenseGroups] = useState<CategoryStructure[]>([]);
+  const [bankList, setBankList] = useState<string[]>([]);
+  const [investmentList, setInvestmentList] = useState<string[]>([]);
   const [projectionSettings, setProjectionSettings] = useState<ProjectionSettings>({ needs_items: NEEDS_ITEMS });
   const [activeTab, setActiveTab] = useState<'dashboard' | 'table'>('table'); 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -77,6 +79,8 @@ function App() {
       setIncomeCategories(settings.income);
       setExpenseGroups(settings.expenses);
       setProjectionSettings(settings.projection);
+      setBankList(settings.banks);
+      setInvestmentList(settings.investments);
     } catch (error) {
       console.error("Erro ao carregar dados", error);
     }
@@ -287,7 +291,19 @@ function App() {
         {activeTab === 'dashboard' ? (
           <Dashboard transactions={filteredTransactions} totalIncome={totalIncome} totalExpenses={totalExpenses} projectionSettings={projectionSettings} onOpenConfig={() => setIsProjectionModalOpen(true)} />
         ) : (
-          <BudgetTable transactions={filteredTransactions} totalIncome={totalIncome} onOpenModalFor={openSpecificModal} incomeCategories={incomeCategories} expenseGroups={expenseGroups} onManageCategories={() => setIsCategoryModalOpen(true)} onOpenImport={() => setIsImportModalOpen(true)} onCategoryClick={handleCategoryClick} onOpenSearch={() => setIsSearchModalOpen(true)} />
+          <BudgetTable 
+            transactions={filteredTransactions} 
+            totalIncome={totalIncome} 
+            onOpenModalFor={openSpecificModal} 
+            incomeCategories={incomeCategories} 
+            expenseGroups={expenseGroups} 
+            bankList={bankList}
+            investmentList={investmentList}
+            onManageCategories={() => setIsCategoryModalOpen(true)} 
+            onOpenImport={() => setIsImportModalOpen(true)} 
+            onCategoryClick={handleCategoryClick} 
+            onOpenSearch={() => setIsSearchModalOpen(true)} 
+          />
         )}
       </main>
 
@@ -309,7 +325,16 @@ function App() {
         onClose={() => setIsCategoryModalOpen(false)} 
         incomeCategories={incomeCategories} 
         expenseGroups={expenseGroups} 
-        onSave={(inc: string[], exp: CategoryStructure[]) => { setIncomeCategories(inc); setExpenseGroups(exp); saveUserSettings(inc, exp, projectionSettings); setIsCategoryModalOpen(false); }} 
+        bankList={bankList}
+        investmentList={investmentList}
+        onSave={(inc: string[], exp: CategoryStructure[], banks: string[], invs: string[]) => { 
+          setIncomeCategories(inc); 
+          setExpenseGroups(exp); 
+          setBankList(banks);
+          setInvestmentList(invs);
+          saveUserSettings(inc, exp, projectionSettings, banks, invs); 
+          setIsCategoryModalOpen(false); 
+        }} 
       />
       
       <BankImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} onImport={handleImportItems} expenseGroups={expenseGroups} incomeCategories={incomeCategories} existingTransactions={transactions} />
@@ -319,7 +344,7 @@ function App() {
         onClose={() => setIsProjectionModalOpen(false)} 
         expenseGroups={expenseGroups} 
         currentSettings={projectionSettings} 
-        onSave={(s: ProjectionSettings) => { setProjectionSettings(s); saveUserSettings(incomeCategories, expenseGroups, s); setIsProjectionModalOpen(false); }} 
+        onSave={(s: ProjectionSettings) => { setProjectionSettings(s); saveUserSettings(incomeCategories, expenseGroups, s, bankList, investmentList); setIsProjectionModalOpen(false); }} 
       />
 
       <SearchTransactionsModal 

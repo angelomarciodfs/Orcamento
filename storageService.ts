@@ -23,15 +23,10 @@ export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Prom
   return data;
 };
 
-/**
- * Estratégia de Delete-and-Insert para garantir persistência 
- * contornando possíveis restrições de RLS ou PK em updates.
- */
 export const updateTransaction = async (id: string, updates: Partial<Transaction>): Promise<Transaction | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   
-  // 1. Excluir o registro antigo
   const { error: deleteError } = await supabase.from('transactions')
     .delete()
     .eq('id', id)
@@ -42,10 +37,7 @@ export const updateTransaction = async (id: string, updates: Partial<Transaction
     return null;
   }
 
-  // 2. Preparar dados para nova inserção (Removendo IDs e campos automáticos)
   const { id: _, created_at: __, user_id: ___, ...cleanData } = updates as any;
-  
-  // 3. Inserir como novo registro
   return await addTransaction(cleanData);
 };
 
@@ -54,28 +46,51 @@ export const deleteTransaction = async (id: string): Promise<boolean> => {
   return !error;
 };
 
-export const fetchUserSettings = async (): Promise<{ income: string[], expenses: CategoryStructure[], projection: ProjectionSettings }> => {
+export const fetchUserSettings = async (): Promise<{ 
+  income: string[], 
+  expenses: CategoryStructure[], 
+  projection: ProjectionSettings,
+  banks: string[],
+  investments: string[]
+}> => {
   const { data: { user } } = await supabase.auth.getUser();
   const defaults = { 
       income: INITIAL_INCOME_CATEGORIES, 
       expenses: INITIAL_EXPENSE_GROUPS,
-      projection: { needs_items: NEEDS_ITEMS }
+      projection: { needs_items: NEEDS_ITEMS },
+      banks: ['Banco CEF', 'Santander', 'Banco do Brasil'],
+      investments: ['Tesouro Direto']
   };
   if (!user) return defaults;
   const { data, error } = await supabase.from('user_settings').select('*').eq('user_id', user.id).single();
   if (error || !data) return defaults;
   return {
-    income: data.income_categories || INITIAL_INCOME_CATEGORIES,
-    expenses: data.expense_groups || INITIAL_EXPENSE_GROUPS,
-    projection: data.projection_settings || { needs_items: NEEDS_ITEMS }
+    income: data.income_categories || defaults.income,
+    expenses: data.expense_groups || defaults.expenses,
+    projection: data.projection_settings || defaults.projection,
+    banks: data.bank_list || defaults.banks,
+    investments: data.investment_list || defaults.investments
   };
 };
 
-export const saveUserSettings = async (income: string[], expenses: CategoryStructure[], projection?: ProjectionSettings) => {
+export const saveUserSettings = async (
+  income: string[], 
+  expenses: CategoryStructure[], 
+  projection?: ProjectionSettings,
+  banks?: string[],
+  investments?: string[]
+) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const payload: any = { user_id: user.id, income_categories: income, expense_groups: expenses };
+  const payload: any = { 
+    user_id: user.id, 
+    income_categories: income, 
+    expense_groups: expenses 
+  };
   if (projection) payload.projection_settings = projection;
+  if (banks) payload.bank_list = banks;
+  if (investments) payload.investment_list = investments;
+  
   await supabase.from('user_settings').upsert(payload);
 };
 
