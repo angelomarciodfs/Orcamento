@@ -1,7 +1,7 @@
 
 import React from 'react';
 import type { Transaction, TransactionType, CategoryStructure } from './types';
-import { Settings, FileSpreadsheet, CreditCard, Search } from 'lucide-react';
+import { Settings, FileSpreadsheet, Search } from 'lucide-react';
 
 interface BudgetTableProps {
   transactions: Transaction[];
