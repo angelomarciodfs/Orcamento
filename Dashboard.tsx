@@ -34,6 +34,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   onOpenConfig
 }) => {
   
+  const formatCurrency = (value: number) => 
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(value);
+
   // Agrupamento de despesas para o gráfico de pizza
   const pieData = useMemo(() => {
     if (!transactions.length) return [];
@@ -186,25 +189,26 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Gráficos em Grade */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-10">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px]">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[450px]">
           <div className="flex items-center gap-2 mb-6">
             <PieIcon size={20} className="text-indigo-500" />
             <h3 className="text-gray-800 font-bold uppercase text-sm">Gastos por Grupo</h3>
           </div>
-          <div className="h-72 w-full">
+          <div className="h-80 w-full">
             {pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
-                    cy="50%"
+                    cy="45%"
                     innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={8}
+                    outerRadius={85}
+                    paddingAngle={5}
                     dataKey="value"
                     animationBegin={0}
                     animationDuration={1000}
+                    label={({ value }) => formatCurrency(value)}
                   >
                     {pieData.map((_, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
@@ -214,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     formatter={(value: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                   />
-                  <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                  <Legend iconType="circle" verticalAlign="bottom" wrapperStyle={{ paddingTop: '20px' }} />
                 </PieChart>
               </ResponsiveContainer>
             ) : (
@@ -226,12 +230,12 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px]">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[450px]">
            <div className="flex items-center gap-2 mb-6">
             <BarChart3 size={20} className="text-indigo-500" />
             <h3 className="text-gray-800 font-bold uppercase text-sm">Balanço Mensal</h3>
           </div>
-           <div className="h-72 w-full">
+           <div className="h-80 w-full">
              <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={barData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
