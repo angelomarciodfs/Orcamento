@@ -1,5 +1,5 @@
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { X, Search, Calendar, Tag, Info, Edit2, Trash2 } from 'lucide-react';
 import type { Transaction } from './types';
 

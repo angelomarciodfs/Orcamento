@@ -8,7 +8,7 @@ interface SplitLine {
   id: string;
   group: string;
   description: string;
-  amount: number;
+  amountStr: string; // Usando string para a máscara
 }
 
 interface TransactionModalProps {
@@ -58,17 +58,19 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const parseCurrency = (value: string): number => {
     const cleanValue = value.replace(/\./g, '').replace(',', '.');
-    return parseFloat(cleanValue);
+    return parseFloat(cleanValue) || 0;
+  };
+
+  // Função auxiliar para aplicar máscara enquanto digita
+  const handleAmountMask = (rawValue: string): string => {
+    const digitsOnly = rawValue.replace(/\D/g, '');
+    if (!digitsOnly) return '';
+    const floatValue = parseInt(digitsOnly) / 100;
+    return formatCurrency(floatValue);
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/\D/g, '');
-    if (!rawValue) {
-        setAmount('');
-        return;
-    }
-    const floatValue = parseInt(rawValue) / 100;
-    setAmount(formatCurrency(floatValue));
+    setAmount(handleAmountMask(e.target.value));
   };
 
   const availableDescriptions = type === 'INCOME' 
@@ -100,10 +102,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         }
         setObservation(editingTransaction.observation || '');
       } else {
-        // Cálculo da data padrão (último dia do mês selecionado)
         const year = selectedMonth.getFullYear();
         const month = selectedMonth.getMonth();
-        const lastDayDate = new Date(year, month + 1, 0); // O dia 0 do próximo mês é o último do atual
+        const lastDayDate = new Date(year, month + 1, 0);
         const formattedDate = `${lastDayDate.getFullYear()}-${String(lastDayDate.getMonth() + 1).padStart(2, '0')}-${String(lastDayDate.getDate()).padStart(2, '0')}`;
         
         setDate(formattedDate);
@@ -138,7 +139,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
 
   const handleStartSplit = () => {
     const totalVal = parseCurrency(amount);
-    if (isNaN(totalVal) || totalVal <= 0) {
+    if (!totalVal || totalVal <= 0) {
       alert("Defina um valor total antes de dividir.");
       return;
     }
@@ -148,21 +149,21 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         id: Math.random().toString(36).substr(2, 9), 
         group: type === 'INCOME' ? 'Receitas' : group, 
         description: description, 
-        amount: totalVal 
+        amountStr: formatCurrency(totalVal)
       }
     ]);
   };
 
   const addSplitLine = () => {
     const totalVal = parseCurrency(amount);
-    const currentSum = splits.reduce((acc, s) => acc + s.amount, 0);
+    const currentSum = splits.reduce((acc, s) => acc + parseCurrency(s.amountStr), 0);
     const remaining = Math.max(0, totalVal - currentSum);
 
     setSplits([...splits, { 
       id: Math.random().toString(36).substr(2, 9), 
-      group: expenseGroups[0]?.name || '', 
-      description: expenseGroups[0]?.items[0] || '', 
-      amount: remaining 
+      group: type === 'INCOME' ? 'Receitas' : (expenseGroups[0]?.name || ''), 
+      description: type === 'INCOME' ? (incomeCategories[0] || '') : (expenseGroups[0]?.items[0] || ''), 
+      amountStr: formatCurrency(remaining) 
     }]);
   };
 
@@ -173,6 +174,11 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
   const updateSplitLine = (id: string, field: keyof SplitLine, value: any) => {
     setSplits(splits.map(s => {
       if (s.id !== id) return s;
+      
+      if (field === 'amountStr') {
+          return { ...s, amountStr: handleAmountMask(value) };
+      }
+
       if (field === 'group' && type === 'EXPENSE') {
           const newGroup = expenseGroups.find(g => g.name === value);
           return { ...s, group: value, description: newGroup?.items[0] || '' };
@@ -181,7 +187,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     }));
   };
 
-  const currentSplitsTotal = splits.reduce((acc, s) => acc + s.amount, 0);
+  const currentSplitsTotal = splits.reduce((acc, s) => acc + parseCurrency(s.amountStr), 0);
   const totalToSplit = parseCurrency(amount);
   const splitDifference = totalToSplit - currentSplitsTotal;
 
@@ -189,41 +195,54 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
     e.preventDefault();
     const numericAmount = parseCurrency(amount);
 
-    if (isNaN(numericAmount)) {
+    if (isNaN(numericAmount) || numericAmount === 0) {
         alert("Por favor, insira um valor válido.");
         return;
     }
 
-    if (isSplitMode) {
-      if (Math.abs(splitDifference) > 0.01) {
-        alert(`A soma das divisões deve ser igual ao valor total.`);
-        return;
-      }
-    }
-
     setIsSubmitting(true);
-    const finalAmount = isNegative ? -Math.abs(numericAmount) : Math.abs(numericAmount);
+    const finalAmountMultiplier = isNegative ? -1 : 1;
 
     try {
         if (isSplitMode) {
+            const finalSplits = splits.map(s => ({
+              type,
+              group: s.group,
+              description: s.description,
+              amount: parseCurrency(s.amountStr) * finalAmountMultiplier,
+              date
+            })).filter(s => Math.abs(s.amount) > 0);
+
+            // Adiciona resíduo automático se houver diferença positiva
+            if (splitDifference > 0.005) {
+                finalSplits.push({
+                    type,
+                    group: editingTransaction?.group || group,
+                    description: editingTransaction?.description || description,
+                    amount: splitDifference * finalAmountMultiplier,
+                    date
+                });
+            }
+
+            if (finalSplits.length === 0) {
+                alert("Nenhuma divisão com valor foi informada.");
+                setIsSubmitting(false);
+                return;
+            }
+
             await onSave({
               isSplit: true,
               originalId: editingTransaction?.id,
               date,
               type,
-              splits: splits.map(s => ({
-                ...s,
-                amount: isNegative ? -Math.abs(s.amount) : Math.abs(s.amount),
-                date,
-                type
-              }))
+              splits: finalSplits
             });
         } else {
             const payload = {
               type,
               group: type === 'INCOME' ? 'Receitas' : group,
               description,
-              amount: finalAmount,
+              amount: numericAmount * finalAmountMultiplier,
               date,
               observation
             };
@@ -324,7 +343,7 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                   <button type="button" onClick={() => setIsNegative(!isNegative)} className={`inline-flex items-center px-3 rounded-l-md border border-r-0 text-sm font-medium transition-colors ${isNegative ? 'bg-red-50 text-red-700 border-red-300' : 'bg-green-50 text-green-700 border-green-300'}`}>
                     {isNegative ? <Minus size={20} /> : <Plus size={20} />}
                   </button>
-                  <input type="tel" required placeholder="0,00" value={amount} onChange={handleAmountChange} readOnly={isSplitMode} className={`block w-full flex-1 rounded-none rounded-r-md border px-3 py-2 text-lg font-mono text-right ${isSplitMode ? 'bg-gray-100 text-gray-500' : (isNegative ? 'text-red-700 border-red-300' : 'text-gray-900 border-gray-300')}`} />
+                  <input type="tel" required placeholder="0,00" value={amount} onChange={handleAmountChange} readOnly={isSplitMode} className={`block w-full flex-1 rounded-none rounded-r-md border px-3 py-2 text-lg font-mono text-right ${isSplitMode ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : (isNegative ? 'text-red-700 border-red-300' : 'text-gray-900 border-gray-300')}`} />
               </div>
             </div>
 
@@ -377,61 +396,65 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
                 </div>
                 
                 {editingTransaction && (
-                  <button type="button" onClick={handleStartSplit} className="w-full py-2 px-4 border-2 border-dashed border-indigo-200 text-indigo-500 rounded-lg hover:bg-indigo-50 font-bold flex items-center justify-center gap-2 transition-colors">
-                    <Calculator size={18} />
-                    Dividir lançamento em várias categorias
+                  <button type="button" onClick={handleStartSplit} className="w-full py-3 px-4 border-2 border-dashed border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50 font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98]">
+                    <Calculator size={20} />
+                    Dividir em várias categorias
                   </button>
                 )}
               </>
             ) : (
               <div className="space-y-4 pt-2 border-t">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-bold text-gray-700 text-sm uppercase">Detalhamento da Divisão</h3>
-                  <div className={`text-xs font-mono font-bold px-2 py-1 rounded ${Math.abs(splitDifference) < 0.01 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                    Restante: {formatCurrency(splitDifference)}
+                <div className="flex justify-between items-center bg-gray-100 p-2 rounded-lg">
+                  <h3 className="font-bold text-gray-700 text-xs uppercase">Itens da Divisão</h3>
+                  <div className={`text-xs font-mono font-bold px-2 py-1 rounded shadow-sm ${splitDifference < -0.005 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                    {splitDifference > 0.005 ? `Restante Automático: ${formatCurrency(splitDifference)}` : `Total: ${formatCurrency(currentSplitsTotal)}`}
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   {splits.map((s) => (
-                    <div key={s.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2 relative">
-                      <button type="button" onClick={() => removeSplitLine(s.id)} className="absolute top-2 right-2 text-red-400 hover:text-red-600"><Trash2 size={16} /></button>
+                    <div key={s.id} className="p-3 bg-white rounded-xl border-2 border-gray-100 shadow-sm space-y-3 relative group">
+                      <button type="button" onClick={() => removeSplitLine(s.id)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={18} /></button>
                       
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
+                      <div className="grid grid-cols-2 gap-2 pr-6">
+                        <div className="space-y-1">
                           <label className="text-[10px] font-bold text-gray-400 uppercase">Grupo</label>
-                          <select value={s.group} onChange={(e) => updateSplitLine(s.id, 'group', e.target.value)} className="w-full p-1 text-xs border rounded">
+                          <select value={s.group} onChange={(e) => updateSplitLine(s.id, 'group', e.target.value)} className="w-full p-2 text-xs border rounded-lg bg-gray-50 focus:bg-white outline-none">
                              {type === 'INCOME' ? <option value="Receitas">Receitas</option> : expenseGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
                           </select>
                         </div>
-                        <div>
+                        <div className="space-y-1">
                           <label className="text-[10px] font-bold text-gray-400 uppercase">Categoria</label>
-                          <select value={s.description} onChange={(e) => updateSplitLine(s.id, 'description', e.target.value)} className="w-full p-1 text-xs border rounded">
+                          <select value={s.description} onChange={(e) => updateSplitLine(s.id, 'description', e.target.value)} className="w-full p-2 text-xs border rounded-lg bg-gray-50 focus:bg-white outline-none">
                              {(type === 'INCOME' ? incomeCategories : (expenseGroups.find(g => g.name === s.group)?.items || [])).map(item => <option key={item} value={item}>{item}</option>)}
                           </select>
                         </div>
                       </div>
                       
-                      <div>
-                        <label className="text-[10px] font-bold text-gray-400 uppercase">Valor da Parte</label>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-gray-400 uppercase">Valor Desta Parte</label>
                         <input 
-                          type="number" 
-                          step="0.01"
-                          value={s.amount} 
-                          onChange={(e) => updateSplitLine(s.id, 'amount', parseFloat(e.target.value) || 0)}
-                          className="w-full p-1 text-sm border rounded font-mono" 
+                          type="tel" 
+                          placeholder="0,00"
+                          value={s.amountStr} 
+                          onChange={(e) => updateSplitLine(s.id, 'amountStr', e.target.value)}
+                          className="w-full p-2 text-sm border rounded-lg font-mono text-right bg-white focus:ring-2 focus:ring-indigo-200 outline-none" 
                         />
                       </div>
                     </div>
                   ))}
                 </div>
 
-                <button type="button" onClick={addSplitLine} className="w-full py-2 bg-gray-100 text-gray-600 rounded-lg text-sm font-bold flex items-center justify-center gap-1 hover:bg-gray-200">
-                  <Plus size={16} /> Adicionar Parte
+                <button type="button" onClick={addSplitLine} className="w-full py-2.5 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1 hover:bg-indigo-100 transition-colors border border-indigo-200">
+                  <Plus size={16} /> Adicionar Categoria
                 </button>
 
-                <button type="button" onClick={() => setIsSplitMode(false)} className="w-full py-1 text-xs text-indigo-600 font-medium hover:underline">
-                  Cancelar divisão
+                <div className="p-3 bg-amber-50 rounded-lg text-[10px] text-amber-800 leading-tight">
+                    * Caso você não divida o valor total, o saldo restante será mantido automaticamente na categoria <strong>{editingTransaction?.description || description}</strong>.
+                </div>
+
+                <button type="button" onClick={() => setIsSplitMode(false)} className="w-full py-1 text-xs text-gray-500 font-medium hover:underline">
+                  Voltar para edição simples
                 </button>
               </div>
             )}
@@ -439,9 +462,9 @@ const TransactionModal: React.FC<TransactionModalProps> = ({
         </form>
 
         <div className="p-4 border-t bg-gray-50 shrink-0">
-          <button type="submit" disabled={isSubmitting} onClick={handleSubmit} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-lg shadow-lg transition-colors flex items-center justify-center gap-2">
+          <button type="submit" disabled={isSubmitting} onClick={handleSubmit} className="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2">
             {isSubmitting && <Loader2 size={18} className="animate-spin" />}
-            {isSplitMode ? 'Confirmar Divisão' : (editingTransaction ? 'Salvar Alterações' : 'Salvar Lançamento')}
+            {isSplitMode ? 'Confirmar e Salvar Divisão' : (editingTransaction ? 'Salvar Alterações' : 'Salvar Lançamento')}
           </button>
         </div>
       </div>

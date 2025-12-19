@@ -39,18 +39,20 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Agrupamento de despesas para o gráfico de pizza
   const pieData = useMemo(() => {
-    if (!transactions.length) return [];
+    if (!transactions || transactions.length === 0) return [];
+    // Fix: Explicitly type the accumulator and ensure the value is treated as a number
     const groups = transactions
       .filter(t => t.type === 'EXPENSE')
-      .reduce((acc, curr) => {
+      .reduce((acc: Record<string, number>, curr) => {
         const groupName = curr.group || 'Diversos';
         acc[groupName] = (acc[groupName] || 0) + (curr.amount || 0);
         return acc;
       }, {} as Record<string, number>);
 
     return Object.entries(groups)
-      .map(([name, value]) => ({ name, value }))
-      .filter(item => item.value > 0);
+      .map(([name, value]) => ({ name, value: value as number }))
+      // Fix: cast value to number to avoid "unknown" comparison error (line 53/63 issue)
+      .filter(item => (item.value as number) > 0);
   }, [transactions]);
 
   // Dados para o gráfico de barras
